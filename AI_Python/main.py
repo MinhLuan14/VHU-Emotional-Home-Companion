@@ -1,37 +1,31 @@
 import os
-import base64
 import uuid
 import cv2
-import asyncio
 import time
 import threading
 import pygame
-from openvoice import se_extractor
+import wave
+
 from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from groq import Groq
-import edge_tts
-from fastapi.responses import StreamingResponse
-from vision_module.emotion_detector import EmotionDetector
-# Import module của bạn
-from vision_module.pose_detector import PoseDetector
-from OpenVoice.voice_service import EmotionalVoice
-# 1. CẤU HÌNH HỆ THỐNG
-print("--- Đang nạp giọng nói người thân (OpenVoice)... ---")
-openvoice_engine = EmotionalVoice()
-load_dotenv()
-app = FastAPI(title="Emotional Home Companion - VHU")
-detector = PoseDetector()
-emotion_analyzer = EmotionDetector()
-# Khởi tạo âm thanh (Pygame mixer)
-try:
-    pygame.mixer.init()
-except Exception as e:
-    print(f"Lưu ý: Không tìm thấy thiết bị âm thanh: {e}")
 
-# Cấu hình CORS cho React Frontend
+from openvoice import se_extractor
+from OpenVoice.voice_service import EmotionalVoice
+
+from vision_module.pose_detector import PoseDetector
+from vision_module.emotion_detector import EmotionDetector
+
+# ================== INIT ==================
+print("🚀 Initializing Emotional AI System...")
+
+load_dotenv()
+app = FastAPI(title="Emotional Home Companion AI")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -40,190 +34,250 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Khởi tạo Groq
+# ================== AUDIO ==================
+AUDIO_DIR = os.path.join(os.getcwd(), "OpenVoice", "outputs")
+os.makedirs(AUDIO_DIR, exist_ok=True)
+
+app.mount("/audio", StaticFiles(directory=AUDIO_DIR), name="audio")
+
+pygame.mixer.init()
+
+# ================== AI ==================
+print("🎤 Loading voice cloning...")
+openvoice_engine = EmotionalVoice()
+
 GROQ_KEY = os.getenv("GROQ_API_KEY")
 client_groq = Groq(api_key=GROQ_KEY)
 
-# Quản lý trạng thái nhắc nhở
-last_warning_time = 0
-WARNING_COOLDOWN = 20  # Giãn cách 20 giây mỗi lần nhắc để không làm phiền nội
-
-class ChatRequest(BaseModel):
-    user_input: str
-
-# Khởi tạo Camera và Detector
+# ================== VISION ==================
 cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-detector = PoseDetector()
+cap.set(3, 640)
+cap.set(4, 480)
 
+pose_detector = PoseDetector()
+emotion_detector = EmotionDetector()
+
+# ================== GLOBAL STATE ==================
 current_ai_status = {
     "status": "Đang khởi động...",
     "is_warning": False,
     "emotion": "Ổn định",
     "color": (255, 255, 255)
 }
-@app.post("/api/ai/upload_voice")
-async def upload_voice(file: UploadFile = File(...)):
-    try:
-        # Đường dẫn lưu file tạm
-        temp_path = os.path.join("OpenVoice", "nguoi_than_upload" + os.path.splitext(file.filename)[1])
-        
-        # Lưu file người dùng gửi lên
-        with open(temp_path, "wb") as buffer:
-            buffer.write(await file.read())
-            
-        # Cập nhật lại vân giọng (SE) trong OpenVoice engine
-        # Luân gọi lại hàm khởi tạo SE của OpenVoice ở đây
-        openvoice_engine.target_se, _ = se_extractor.get_se(
-            temp_path, 
-            openvoice_engine.converter, 
-            target_dir='processed'
-        )
-        
-        return {"status": "success", "message": "Đã cập nhật giọng người thân mới!"}
-    except Exception as e:
-        return {"status": "error", "detail": str(e)}
+
+lip_sync_data = []
+current_audio_url = ""
+face_tracking = {"x": 0.5, "y": 0.5}
+
+last_warning_time = 0
+last_status = ""
+WARNING_COOLDOWN = 20
+
+audio_lock = threading.Lock()
+
+# ================== MODELS ==================
+class ChatRequest(BaseModel):
+    user_input: str
+
+# ================== VOICE ==================
 def play_voice_worker(text):
-    """SỬ DỤNG OPENVOICE ĐỂ CLONE GIỌNG NGƯỜI THÂN"""
-    unique_id = uuid.uuid4().hex[:8]
-    file_name_only = f"clone_{unique_id}.wav"
-    
-    # 1. Lấy đường dẫn gốc của dự án (AI_Python)
-    base_path = os.getcwd() 
-    
-    # 2. Trỏ thẳng vào cái kho OpenVoice/outputs (Nơi file thực sự sinh ra)
-    # Dùng os.path.join để Windows không bị lỗi dấu gạch chéo
-    final_filename = os.path.join(base_path, "OpenVoice", "outputs", file_name_only)
-    
-    try:
-        print(f"⏳ Đang tạo giọng nói cho: {text[:30]}...")
-        # Gọi OpenVoice tạo file
-        openvoice_engine.speak(text, filename=file_name_only)
-        
-        # Đợi file ghi xong
-        time.sleep(0.8) 
-        
-        if os.path.exists(final_filename):
-            print(f"🔊 Robot đang nói (File: {file_name_only})")
-            
-            if not pygame.mixer.get_init():
-                pygame.mixer.init()
-            
-            pygame.mixer.music.load(final_filename)
-            pygame.mixer.music.play()
-            
-            while pygame.mixer.music.get_busy():
-                pygame.time.Clock().tick(10)
-            
-            pygame.mixer.music.stop()
-            pygame.mixer.music.unload() 
-            
-            # Sau khi phát xong thì dọn dẹp cho sạch máy
-            os.remove(final_filename)
-        else:
-            # Nếu vẫn không thấy, ta in ra danh sách file để "truy vết"
-            print(f"❌ Không tìm thấy file tại: {final_filename}")
-            print(f"📂 Thử kiểm tra thư mục: {os.path.dirname(final_filename)}")
-            
-    except Exception as e:
-        print(f"❌ Lỗi phát âm thanh: {e}")
+    global lip_sync_data, current_audio_url
 
-def trigger_auto_remind(status_text, emotion):
-    global last_warning_time
-    current_time = time.time()
-    
-    if current_time - last_warning_time > WARNING_COOLDOWN:
-        last_warning_time = current_time
-        
-        # Prompt "thông minh" hơn cho Groq
-        prompt = (
-            f"Nội đang bị: {status_text}. "
-            f"Vẻ mặt nội đang: {emotion}. "
-            f"Hãy là cháu Luân, dựa vào tình trạng và cảm xúc này để an ủi và nhắc nội. "
-            f"Nếu nội buồn, hãy nói ngọt ngào hơn. Nếu nội đang mệt (ngồi khom), hãy rủ nội nghỉ ngơi."
-        )
-        
+    with audio_lock:
         try:
-            completion = client_groq.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[
-                    {
-                        "role": "system", 
-                        "content": "Bạn là Luân, cháu nội miền Nam cực kỳ hiếu thảo và tâm lý. Nói chuyện ngọt ngào, dùng từ: dạ, thưa, nha nội, thương nội."
-                    },
-                    {"role": "user", "content": prompt}
-                ]
-            )
-            remind_text = completion.choices[0].message.content.strip()
-            
-            # Làm sạch văn bản (loại bỏ dấu ngoặc kép nếu AI tự thêm vào)
-            remind_text = remind_text.replace('"', '').replace("'", "")
-            
-            print(f"🤖 AI: {remind_text}")
-            
-            # Phát loa qua thread riêng
-            threading.Thread(target=play_voice_worker, args=(remind_text,), daemon=True).start()
-            
-        except Exception as e:
-            print(f"Lỗi Groq API: {e}")
-# --- 3. STREAMING VIDEO FEED ---
+            uid = uuid.uuid4().hex[:8]
+            filename = f"voice_{uid}.wav"
+            filepath = os.path.join(AUDIO_DIR, filename)
 
+            print(f"🎤 Generating: {text}")
+
+            openvoice_engine.speak(text, filename=filename)
+
+            time.sleep(0.4)
+
+            if not os.path.exists(filepath):
+                print("❌ Audio not found")
+                return
+
+            # ===== LIP SYNC (THEO AUDIO REAL) =====
+            with wave.open(filepath, 'rb') as wf:
+                duration = wf.getnframes() / wf.getframerate()
+
+            steps = max(8, int(duration * 12))  # mượt hơn
+            interval = duration / steps
+
+            lip_sync_data = [
+                {"time": i * interval, "phoneme": "A"}
+                for i in range(steps)
+            ]
+
+            current_audio_url = f"/audio/{filename}"
+
+            # ===== PLAY AUDIO =====
+            pygame.mixer.music.load(filepath)
+            pygame.mixer.music.play()
+
+            while pygame.mixer.music.get_busy():
+                pygame.time.Clock().tick(30)
+
+            pygame.mixer.music.stop()
+
+            # ===== RESET =====
+            lip_sync_data = []
+            current_audio_url = ""
+
+        except Exception as e:
+            print(f"❌ Voice error: {e}")
+
+# ================== QUICK RULE (FALLBACK) ==================
+def quick_remind(status, emotion):
+    if "khom" in status:
+        return "Dạ nội ơi, nội ngồi thẳng lại nha."
+    if "nghiêng" in status:
+        return "Nội ơi, giữ thăng bằng lại nha."
+    if emotion == "Buồn":
+        return "Dạ nội đừng buồn, có con đây nha."
+    return "Dạ nội giữ sức khỏe nha."
+
+# ================== AI REMINDER ==================
+def trigger_auto_remind(status_text, emotion):
+    global last_warning_time, last_status
+
+    now = time.time()
+
+    # tránh spam
+    if now - last_warning_time < WARNING_COOLDOWN:
+        return
+
+    if status_text == last_status:
+        return
+
+    last_warning_time = now
+    last_status = status_text
+
+    try:
+        prompt = f"""
+        Nội đang: {status_text}
+        Cảm xúc: {emotion}
+
+        Chỉ nói 1 câu dưới 15 từ, giọng cháu nội miền Nam.
+        """
+
+        res = client_groq.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            max_tokens=40,
+            temperature=0.6,
+            messages=[
+                {"role": "system", "content": "Chỉ trả lời 1 câu ngắn dưới 15 từ."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+
+        text = res.choices[0].message.content.strip()
+
+        # ===== HARD CUT =====
+        text = text.split(".")[0]
+        words = text.split()[:15]
+        text = " ".join(words)
+
+    except:
+        # fallback nếu AI lỗi
+        text = quick_remind(status_text, emotion)
+
+    print(f"🤖 AI: {text}")
+
+    threading.Thread(
+        target=play_voice_worker,
+        args=(text,),
+        daemon=True
+    ).start()
+
+# ================== VIDEO STREAM ==================
 def generate_frames():
-    global current_ai_status
-    pTime = 0
+    global current_ai_status, face_tracking
+
+    prev_time = 0
 
     while True:
-        success, frame = cap.read()
-        if not success: break
-        
-        # 1. Nhận diện Tư thế
-        frame = detector.findPose(frame)
-        lmList = detector.getPosition(frame, draw=False) 
-        status_text, color = detector.detect_posture()
+        ret, frame = cap.read()
+        if not ret:
+            break
 
-        stable_emotion = emotion_analyzer.detect(frame, detector.results.pose_landmarks.landmark if detector.results.pose_landmarks else None)
+        frame = pose_detector.findPose(frame)
+        pose_detector.getPosition(frame, draw=False)
 
-        # 3. Cập nhật trạng thái tổng hợp cho Frontend
-        is_warning = any(icon in status_text for icon in ["🚨", "⚠️", "🆘"])
-        
+        status_text, color = pose_detector.detect_posture()
+
+        emotion = emotion_detector.detect(
+            frame,
+            pose_detector.results.pose_landmarks.landmark
+            if pose_detector.results.pose_landmarks else None
+        )
+
+        # ===== HEAD TRACK =====
+        if pose_detector.results.pose_landmarks:
+            nose = pose_detector.results.pose_landmarks.landmark[0]
+            face_tracking["x"] = float(nose.x)
+            face_tracking["y"] = float(nose.y)
+
+        is_warning = any(x in status_text for x in ["🚨", "⚠️", "🆘"])
+
         current_ai_status = {
             "status": status_text,
             "is_warning": is_warning,
-            "emotion": stable_emotion, 
+            "emotion": emotion,
             "color": color
         }
 
         if is_warning:
-            trigger_auto_remind(status_text, stable_emotion)
+            trigger_auto_remind(status_text, emotion)
 
-        # 5. Vẽ giao diện (UI) lên Frame
+        # ===== UI =====
         cv2.rectangle(frame, (0, 0), (640, 60), (0, 0, 0), -1)
-        # Sửa màu từ BGR sang hiển thị đúng trên Text
-        text_color = (color[2], color[1], color[0]) 
-        
-        cv2.putText(frame, f"ROBOT: {status_text}", (20, 40), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, text_color, 2)
-        
-        # Hiển thị FPS (Đã sửa lỗi fontFace)
-        cTime = time.time()
-        fps = 1 / (cTime - pTime) if (cTime - pTime) > 0 else 0
-        pTime = cTime
-        cv2.putText(frame, f"FPS: {int(fps)}", (540, 40), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
 
-        # Encode frame
-        ret, buffer = cv2.imencode('.jpg', frame)
-        if not ret: continue
-        
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+        cv2.putText(
+            frame,
+            status_text,
+            (20, 40),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (color[2], color[1], color[0]),
+            2
+        )
 
-# --- 4. CÁC API ENDPOINTS ---
+        # FPS
+        curr = time.time()
+        fps = 1 / (curr - prev_time) if curr != prev_time else 0
+        prev_time = curr
 
+        cv2.putText(
+            frame,
+            f"FPS: {int(fps)}",
+            (500, 40),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            (0, 255, 255),
+            2
+        )
+
+        _, buffer = cv2.imencode(".jpg", frame)
+
+        yield (
+            b"--frame\r\n"
+            b"Content-Type: image/jpeg\r\n\r\n" +
+            buffer.tobytes() +
+            b"\r\n"
+        )
+
+# ================== API ==================
 @app.get("/api/ai/status")
-async def get_latest_status():
-    return current_ai_status
+async def full_state():
+    return {
+        "status": current_ai_status,
+        "lip_sync": lip_sync_data,
+        "audio": current_audio_url,
+        "face": face_tracking
+    }
 
 @app.get("/api/ai/video_feed")
 def video_feed():
@@ -233,28 +287,57 @@ def video_feed():
     )
 
 @app.post("/api/ai/chat")
-async def manual_chat_api(request: ChatRequest):
-    """API dành cho việc nhắn tin trực tiếp với Robot trên giao diện"""
+async def chat(req: ChatRequest):
     try:
-        completion = client_groq.chat.completions.create(
+        res = client_groq.chat.completions.create(
             model="llama-3.3-70b-versatile",
+            max_tokens=40,
             messages=[
-                {"role": "system", "content": "Bạn là Luân, cháu nội hiếu thảo. Trả lời lễ phép, ấm áp, ngắn dưới 3 câu."},
-                {"role": "user", "content": request.user_input}
+                {"role": "system", "content": "Trả lời 1 câu ngắn."},
+                {"role": "user", "content": req.user_input}
             ]
         )
-        ai_text = completion.choices[0].message.content.strip()
-        return {"status": "success", "text": ai_text}
+
+        text = res.choices[0].message.content.strip()
+        text = text.split(".")[0]
+        text = " ".join(text.split()[:15])
+
+        threading.Thread(
+            target=play_voice_worker,
+            args=(text,),
+            daemon=True
+        ).start()
+
+        return {"text": text}
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/ai/upload_voice")
+async def upload_voice(file: UploadFile = File(...)):
+    try:
+        temp_path = os.path.join("OpenVoice", file.filename)
+
+        with open(temp_path, "wb") as f:
+            f.write(await file.read())
+
+        openvoice_engine.target_se, _ = se_extractor.get_se(
+            temp_path,
+            openvoice_engine.converter,
+            target_dir='processed'
+        )
+
+        return {"status": "updated"}
+
+    except Exception as e:
+        return {"error": str(e)}
+
+# ================== RUN ==================
 if __name__ == "__main__":
     import uvicorn
-    print("\n" + "="*50)
-    print("🚀 EMOTIONAL HOME COMPANION SERVER IS STARTING")
-    print("📡 Local API: http://localhost:8000")
-    print("="*50 + "\n")
-    
+
+    print("🚀 Server running at http://localhost:8000")
+
     try:
         uvicorn.run(app, host="0.0.0.0", port=8000)
     finally:

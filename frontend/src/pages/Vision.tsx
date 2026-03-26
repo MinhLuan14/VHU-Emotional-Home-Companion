@@ -6,7 +6,10 @@ import {
     Mic, MicOff, Volume2, Brain, Upload, UserPlus, Loader2, X, Save
 } from 'lucide-react';
 import { API_AI_URL } from '../config';
-
+import { Canvas } from '@react-three/fiber';
+import { Suspense } from 'react';
+import { OrbitControls, Stage, Environment, Float } from '@react-three/drei';
+import { EveRobot } from '../components/EveRobot';
 interface AIData {
     status: string;
     is_warning: boolean;
@@ -151,6 +154,23 @@ const Vision: React.FC = () => {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-700 pb-10">
+            {/* THÔNG BÁO NỔI (ALERT OVERLAY) */}
+            {aiData.is_warning && (
+                <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 animate-bounce w-full max-w-md px-4">
+                    <div className="bg-red-500 text-white px-6 py-4 rounded-[2rem] shadow-2xl flex items-center gap-4 border-2 border-white/30 backdrop-blur-lg">
+                        <div className="bg-white/20 p-2 rounded-full">
+                            <span className="text-2xl">⚠️</span>
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-black opacity-80 uppercase tracking-tighter">AI Alert System</span>
+                            <span className="font-bold text-sm leading-tight">
+                                {/* Luân lấy từ aiData.status hoặc aiData.message tùy theo Backend trả về */}
+                                {aiData.status || "Phát hiện tư thế không tốt!"}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            )}
             <audio ref={audioRef} hidden />
 
             {/* HEADER */}
@@ -295,114 +315,35 @@ const Vision: React.FC = () => {
 
                 {/* RIGHT: AI BEHAVIOR & EMOTION ANALYSIS */}
                 <div className="col-span-12 lg:col-span-4 space-y-6">
-                    {/* Main AI Status Card */}
-                    <div className={`relative overflow-hidden rounded-[2.5rem] p-1 shadow-2xl transition-all duration-700 ${aiData.is_warning ? 'bg-gradient-to-br from-red-500 via-rose-500 to-orange-500' : 'bg-gradient-to-br from-slate-100 to-slate-200'
-                        }`}>
-                        <div className="bg-white/90 backdrop-blur-xl rounded-[2.4rem] p-8 h-full">
-                            {/* Header: AI Scanner Effect */}
-                            <div className="flex items-center justify-between mb-10">
-                                <div className="flex items-center gap-4">
-                                    <div className={`relative p-3 rounded-2xl ${aiData.is_warning ? 'bg-red-500 text-white' : 'bg-indigo-600 text-white shadow-lg shadow-indigo-200'}`}>
-                                        <Activity size={24} className={aiData.is_warning ? 'animate-pulse' : ''} />
-                                        {!aiData.is_warning && <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
-                                        </span>}
-                                    </div>
-                                    <div>
-                                        <h3 className="font-black text-slate-800 uppercase text-xs tracking-[0.2em]">AI Guardian System</h3>
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase">VHU - Emotional Companion</p>
-                                    </div>
-                                </div>
-                            </div>
 
-                            <div className="space-y-8">
-                                {/* Visual Status Node */}
-                                <div className="flex flex-col items-center justify-center py-6 border-y border-slate-100 relative">
-                                    {/* Hiệu ứng radar quét khi bình thường */}
-                                    {!aiData.is_warning && <div className="absolute inset-0 flex items-center justify-center opacity-10">
-                                        <div className="w-32 h-32 border border-emerald-500 rounded-full animate-[ping_3s_linear_infinite]"></div>
-                                    </div>}
-
-                                    <div className={`w-24 h-24 rounded-[2.5rem] flex items-center justify-center text-4xl shadow-2xl transition-all duration-500 z-10 ${aiData.is_warning
-                                        ? 'bg-red-500 text-white scale-110 shadow-red-200 animate-bounce'
-                                        : 'bg-white text-emerald-500 border-4 border-emerald-50'
-                                        }`}>
-                                        {aiData.is_warning ? '🚨' : (aiData.emotion === 'Vui vẻ' ? '😊' : '🤖')}
-                                    </div>
-
-                                    <div className="text-center mt-6 space-y-2">
-                                        <h4 className={`text-3xl font-black tracking-tighter ${aiData.is_warning ? 'text-red-600' : 'text-slate-800'}`}>
-                                            {aiData.status.replace(/🚨|⚠️|🆘|✅|🧘/g, '')}
-                                        </h4>
-                                        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-100">
-                                            <div className={`w-2 h-2 rounded-full ${aiData.is_warning ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`}></div>
-                                            <p className="text-[11px] font-black text-slate-600 uppercase tracking-widest">
-                                                Cảm xúc: <span className="text-indigo-600">{aiData.emotion}</span>
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Metrics Grid: Glassmorphism Style */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="group bg-gradient-to-b from-slate-50 to-white p-5 rounded-[2rem] border border-slate-100 hover:border-indigo-200 transition-all">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Góc lưng</p>
-                                            <div className="p-1.5 bg-white rounded-lg shadow-sm text-indigo-500"><Activity size={12} /></div>
-                                        </div>
-                                        <div className="flex items-baseline gap-1">
-                                            <span className="text-2xl font-black text-slate-800 tracking-tighter">{aiData.back_angle || 0}°</span>
-                                            <span className={`text-[10px] font-bold uppercase ${aiData.back_angle < 155 ? 'text-orange-500' : 'text-emerald-500'}`}>
-                                                {aiData.back_angle < 155 ? 'Khom' : 'Thẳng'}
-                                            </span>
-                                        </div>
-                                        <div className="w-full bg-slate-200 h-1.5 mt-3 rounded-full overflow-hidden">
-                                            <div className="bg-indigo-500 h-full transition-all duration-1000" style={{ width: `${(aiData.back_angle / 180) * 100}%` }}></div>
-                                        </div>
-                                    </div>
-
-                                    <div className="group bg-gradient-to-b from-slate-50 to-white p-5 rounded-[2rem] border border-slate-100 hover:border-red-200 transition-all">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Vận tốc</p>
-                                            <div className="p-1.5 bg-white rounded-lg shadow-sm text-rose-500"><Activity size={12} /></div>
-                                        </div>
-                                        <div className="flex items-baseline gap-1">
-                                            <span className={`text-2xl font-black tracking-tighter ${aiData.velocity > 30 ? 'text-red-500' : 'text-slate-800'}`}>
-                                                {Math.abs(aiData.velocity || 0).toFixed(1)}
-                                            </span>
-                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">px/frame</span>
-                                        </div>
-                                        <div className="w-full bg-slate-200 h-1.5 mt-3 rounded-full overflow-hidden">
-                                            <div className={`h-full transition-all duration-300 ${aiData.velocity > 30 ? 'bg-red-500' : 'bg-rose-400'}`}
-                                                style={{ width: `${Math.min((Math.abs(aiData.velocity) / 50) * 100, 100)}%` }}></div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* AI Insight Section */}
-                                <div className={`rounded-[2rem] p-6 border transition-all duration-500 ${aiData.is_warning
-                                    ? 'bg-red-50 border-red-100 shadow-inner'
-                                    : 'bg-indigo-50/50 border-indigo-100 shadow-sm'
-                                    }`}>
-                                    <div className="flex gap-4">
-                                        <div className={`w-10 h-10 shrink-0 rounded-2xl flex items-center justify-center shadow-md ${aiData.is_warning ? 'bg-red-500 text-white' : 'bg-white text-indigo-600'
-                                            }`}>
-                                            <Brain size={20} />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <p className="text-[10px] font-black text-indigo-900/40 uppercase tracking-widest font-mono">AI Suggestion</p>
-                                            <p className={`text-xs font-bold leading-relaxed ${aiData.is_warning ? 'text-red-900' : 'text-indigo-900'}`}>
-                                                "{aiData.is_warning
-                                                    ? "Phát hiện chuyển động rơi tự do bất thường! Đang kích hoạt giao thức cứu hộ và phát cảnh báo âm thanh."
-                                                    : "Trạng thái ổn định. Cụ đang có tư thế ngồi khoa học và tâm trạng tích cực."}"
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
+                    {/* TÍCH HỢP MỚI: ROBOT 3D COMPANION */}
+                    <div className="h-[80%] w-full bg-slate-50 rounded-[2.5rem] overflow-hidden border border-slate-100 shadow-xl relative group">
+                        <div className="absolute top-6 left-6 z-10">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">3D Companion Active</p>
+                            <div className="flex items-center gap-2">
+                                <div className={`w-2 h-2 rounded-full ${aiData.is_warning ? 'bg-red-500 animate-ping' : 'bg-emerald-500 animate-pulse'}`}></div>
+                                <span className="text-[11px] font-bold text-slate-600">EVE-01 ONLINE</span>
                             </div>
                         </div>
+
+                        <Canvas shadows camera={{ position: [0, 1, 6], fov: 35 }}>
+                            {/* Ánh sáng mạnh mẽ hơn để Robot nổi khối */}
+                            <ambientLight intensity={1} />
+                            <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={2} castShadow />
+                            <pointLight position={[-10, -10, -10]} intensity={1} />
+                            <directionalLight position={[0, 5, 5]} intensity={1} />
+
+                            <Suspense fallback={null}>
+                                {/* Thêm Float để Robot bay bổng tự nhiên */}
+                                <Float speed={2} rotationIntensity={0.5} floatIntensity={0.5}>
+                                    <EveRobot aiData={aiData} />
+                                </Float>
+                                {/* Environment giúp vật liệu kim loại/nhựa của Robot sáng bóng hơn */}
+                                <Environment preset="city" />
+                            </Suspense>
+                        </Canvas>
                     </div>
+
                 </div>
             </div>
         </div>

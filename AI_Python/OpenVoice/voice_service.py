@@ -15,7 +15,7 @@ class EmotionalVoice:
         self.converter = ToneColorConverter(f'{self.ckpt_converter}/config.json', device=self.device)
         self.converter.load_ckpt(f'{self.ckpt_converter}/checkpoint.pth')
         
-        self.target_se, _ = se_extractor.get_se('OpenVoice/nguoi_than.wav', self.converter, target_dir='processed')
+        self.target_se, _ = se_extractor.get_se('nguoi_than.wav', self.converter, target_dir='processed')
         self.source_se = torch.load('OpenVoice/checkpoints/base_speakers/ses/en-default.pth', map_location=self.device)
 
     def speak(self, text, filename="canh_bao.wav"):
