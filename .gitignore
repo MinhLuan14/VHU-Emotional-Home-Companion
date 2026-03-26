@@ -1,0 +1,74 @@
+# Chặn môi trường ảo Python
+AI_Python/env_vision/
+**/__pycache__/
+*.pyc
+
+# Chặn các file Model nặng của dự án AI
+*.pth
+*.onnx
+*.ckpt
+*.bin
+AI_Python/GPT-SoVITS/
+
+# Chặn Node modules (nếu có)
+node_modules/
+# Chặn mọi thư mục venv hoặc env ở bất kỳ cấp nào
+**/venv/
+**/env/
+# Chặn các thư mục cụ thể bạn đã đặt tên
+AI_Python/env_vision/
+AI_Python/OpenVoice/venv/
+# --- Dependencies & Environments ---
+node_modules/
+.pnp
+.pnp.js
+.env
+.env.*
+!.env.example
+AI_Python/.env
+venv/
+.venv/
+# Chặn môi trường ảo cụ thể của bạn
+AI_Python/env_vision/
+
+# --- Build outputs ---
+dist/
+dist-ssr/
+build/
+bin/
+obj/
+*.tsbuildinfo
+
+# --- Python specific ---
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+
+# --- Heavy AI Models & Data (Quan trọng nhất) ---
+*.pth
+*.onnx
+*.ckpt
+*.bin
+*.pt
+# Chặn thư mục model và folder GPT-SoVITS nếu bạn không muốn đẩy source gốc của nó lên
+AI_Python/GPT-SoVITS/
+AI_Python/GPT-SoVITS/pretrained_models/
+
+# --- Logs ---
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# --- Editor & OS ---
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.sln
+*.sw?

@@ -1,0 +1,14 @@
+# .env.example — Cấu hình biến môi trường
+# Copy file này thành .env và điền thông tin thật
+
+# ============================================================
+# GEMINI API KEY (Bắt buộc)
+# Lấy tại: https://aistudio.google.com/app/apikey
+# ============================================================
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# ============================================================
+# (Tùy chọn) URL backend nếu deploy lên server khác localhost
+# Mặc định: http://localhost:8000
+# ============================================================
+# VITE_API_URL=http://your-server:8000

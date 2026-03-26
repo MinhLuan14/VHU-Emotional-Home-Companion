@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 1. CẤU HÌNH NỀN TẢNG */
+@layer base {
+  html {
+    /* Font Inter rất sạch sẽ, dễ đọc cho mắt người già */
+    font-family: 'Inter', system-ui, sans-serif;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    /* Fix lỗi: Sử dụng bg-warm-bg đã định nghĩa trong config */
+    @apply bg-warm-bg text-elderly-text text-xl;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Chế độ tương phản cao cho người khiếm thị nhẹ */
+  @media (prefers-contrast: high) {
+    :root {
+      --color-elderly-accent: #C2410C;
+      /* Cam đậm hơn */
+      --color-elderly-text: #000000;
+    }
+  }
+
+  /* Giảm chuyển động nếu người dùng bị chóng mặt/tiền đình */
+  @media (prefers-reduced-motion: reduce) {
+
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* 2. CÁC THÀNH PHẦN GIAO DIỆN (COMPONENTS) */
+@layer components {
+
+  /* Nút bấm khổng lồ: Chống bấm nhầm cho tay người già bị run */
+  .btn-large {
+    @apply px-8 py-5 text-xl font-bold rounded-2xl border-2 border-transparent transition-all duration-300 flex items-center justify-center gap-3 active:scale-95 shadow-md;
+    min-height: 64px;
+  }
+
+  .btn-primary {
+    @apply bg-elderly-accent text-white hover:bg-orange-600 shadow-orange-200 shadow-xl;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-elderly-text border-elderly-border hover:bg-gray-50 shadow-sm;
+  }
+
+  /* Card theo phong cách Bento ấm áp */
+  .card-elderly {
+    @apply bg-white rounded-elder border-2 border-elderly-soft shadow-xl p-8 transition-transform hover:scale-[1.01];
+  }
+
+  /* Ô nhập liệu to rõ */
+  .input-large {
+    @apply w-full px-6 py-4 text-xl border-4 border-elderly-soft rounded-2xl focus:outline-none focus:ring-4 focus:ring-elderly-accent/20 focus:border-elderly-accent transition-all bg-white;
+  }
+
+  /* Chỉ báo cảm xúc sinh động */
+  .emotion-badge {
+    @apply w-24 h-24 rounded-full border-8 border-white shadow-2xl flex items-center justify-center text-5xl animate-bounce-slow;
+  }
+
+  .emotion-happy {
+    @apply bg-green-100;
+  }
+
+  .emotion-sad {
+    @apply bg-blue-100;
+  }
+
+  .emotion-neutral {
+    @apply bg-orange-100;
+  }
+}
+
+/* 3. TÙY CHỈNH THANH CUỘN (Dễ nhìn - Dễ kéo) */
+::-webkit-scrollbar {
+  width: 16px;
+  /* Làm thanh cuộn to hơn để dễ tương tác */
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-warm-bg;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-orange-200 rounded-full border-4 border-warm-bg;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-elderly-accent;
+}
+
+.glass-effect {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
