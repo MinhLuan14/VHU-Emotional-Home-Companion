@@ -1,35 +1,33 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Webcam from 'react-webcam';
 import {
-    Camera, ShieldAlert, Activity, Settings, CheckCircle2,
-    RefreshCw, AlertTriangle, Home as HomeIcon, User,
-    Mic, MicOff, Volume2, Brain, Upload, UserPlus, Loader2, X, Save
+    Camera, ShieldAlert, Activity, Home as HomeIcon, User,
+    Mic, MicOff, Volume2, UserPlus, Loader2, X, Info
 } from 'lucide-react';
 import { API_AI_URL } from '../config';
 import { Canvas } from '@react-three/fiber';
 import { Suspense } from 'react';
-import { OrbitControls, Stage, Environment, Float } from '@react-three/drei';
+import { OrbitControls, Environment, Float } from '@react-three/drei';
 import { EveRobot } from '../components/EveRobot';
+
 interface AIData {
     status: string;
     is_warning: boolean;
     emotion: string;
-    back_angle: number;
-    velocity: number;
+    back_angle?: number;
+    velocity?: number;
+    face?: { x: number; y: number };
 }
 
-// Định nghĩa interface cho người thân
 interface Relative {
     id: string;
     name: string;
 }
 
 const Vision: React.FC = () => {
-    // --- CÁC STATE CŨ CỦA BẠN ---
+    // --- STATE LOGIC ---
     const [isAIOn, setIsAIOn] = useState(true);
     const [cameraSource, setCameraSource] = useState<'device' | 'home'>('device');
-    const [isSedentaryWarning, setIsSedentaryWarning] = useState(false);
-    const webcamRef = useRef<Webcam>(null);
     const [isListening, setIsListening] = useState(false);
     const [aiResponseText, setAiResponseText] = useState("");
     const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -37,11 +35,8 @@ const Vision: React.FC = () => {
         status: "Đang kết nối...",
         is_warning: false,
         emotion: "Ổn định",
-        back_angle: 0,
-        velocity: 0
     });
 
-    // --- BỔ SUNG STATE CHO OPENVOICE ---
     const [relatives, setRelatives] = useState<Relative[]>([
         { id: 'grandson', name: 'Cháu Minh' },
         { id: 'daughter', name: 'Con Lan' },
@@ -50,300 +45,376 @@ const Vision: React.FC = () => {
     const [selectedRelative, setSelectedRelative] = useState<Relative>(relatives[0]);
     const [showAddVoice, setShowAddVoice] = useState(false);
     const [newName, setNewName] = useState("");
-    const [isRecordingSample, setIsRecordingSample] = useState(false);
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-
-    // --- LOGIC FETCH STATUS (GIỮ NGUYÊN) ---
+    const [isHandsFree, setIsHandsFree] = useState(true);
+    const [isSpeaking, setIsSpeaking] = useState(false);
     useEffect(() => {
+        let timeoutId: NodeJS.Timeout;
+
         const fetchStatus = async () => {
             try {
-                const response = await fetch('http://localhost:8000/api/ai/status');
+                const response = await fetch(`${API_AI_URL}/api/ai/status`);
                 if (response.ok) {
                     const data = await response.json();
-                    setAiData(data);
+                    setAiData({
+                        status: data.status.status,
+                        is_warning: data.status.is_warning,
+                        emotion: data.status.emotion,
+                        face: data.face
+                    });
                 }
             } catch (error) {
-                console.error("Không thể lấy dữ liệu AI:", error);
+                console.error("Connection lost:", error);
+            } finally {
+                timeoutId = setTimeout(fetchStatus, 500);
             }
         };
-        const interval = setInterval(fetchStatus, 1000);
-        return () => clearInterval(interval);
+
+        fetchStatus();
+        return () => clearTimeout(timeoutId);
     }, []);
 
-    // --- LOGIC VOICE CHAT (GIỮ NGUYÊN) ---
     const handleVoiceChat = async (transcript: string) => {
-        setIsListening(false);
+        setIsProcessing(true);
+        setIsListening(false); // Tắt mic ngay lập tức
+
         try {
             const response = await fetch(`${API_AI_URL}/api/ai/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     user_input: transcript,
-                    voice_id: selectedRelative.id
+                    relative_id: selectedRelative.id
                 }),
             });
+
             const data = await response.json();
             setAiResponseText(data.text);
-            if (data.audio && audioRef.current) {
-                audioRef.current.src = data.audio;
-                audioRef.current.play();
+
+            if (data.audio_url) {
+                const audio = new Audio(`${API_AI_URL}${data.audio_url}?t=${Date.now()}`);
+                audioRef.current = audio;
+
+                // Khi AI bắt đầu nói
+                audio.onplay = () => {
+                    setIsProcessing(true); // Giữ trạng thái bận để useEffect không kích hoạt Mic
+                };
+
+                // KHI AI NÓI XONG -> Kích hoạt lại vòng lặp nghe
+                audio.onended = () => {
+                    setIsProcessing(false); // Giải phóng trạng thái, useEffect sẽ tự gọi startListening()
+                };
+
+                //await audio.play();
+            } else {
+                // Nếu không có audio, nghỉ 1 chút rồi nghe tiếp
+                setTimeout(() => setIsProcessing(false), 1000);
             }
+
         } catch (error) {
-            console.error("Lỗi giao tiếp:", error);
+            console.error("Chat error:", error);
+            setIsProcessing(false); // Luôn giải phóng để không bị treo Mic
         }
     };
+
+    useEffect(() => {
+        let timer: NodeJS.Timeout;
+
+        // Chỉ tự động bật lại nếu đang ở chế độ rảnh tay và AI đang RẢNH (không nghe, không xử lý, không nói)
+        if (isHandsFree && !isListening && !isProcessing && !isSpeaking) {
+
+            // Thêm khoảng nghỉ 1 giây để trình duyệt và phần cứng Mic có thời gian "thở"
+            timer = setTimeout(() => {
+                console.log("🔄 Tự động kích hoạt lại Mic sau 1s...");
+                startListening();
+            }, 1000);
+        }
+
+        return () => {
+            if (timer) clearTimeout(timer);
+        };
+    }, [isHandsFree, isListening, isProcessing, isSpeaking]);
+
+    // 1. Định nghĩa Interface để TypeScript không báo lỗi "Cannot find name"
+    interface IWindow extends Window {
+        webkitSpeechRecognition: any;
+        SpeechRecognition: any;
+    }
+
+    const { webkitSpeechRecognition, SpeechRecognition } = window as unknown as IWindow;
 
     const startListening = () => {
-        setIsListening(true);
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (SpeechRecognition) {
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'vi-VN';
-            recognition.onresult = (event: any) => {
-                const transcript = event.results[0][0].transcript;
-                handleVoiceChat(transcript);
-            };
+        // CHẶN: Không bật mic nếu AI đang nói hoặc đang xử lý dữ liệu
+        if (isProcessing || isListening) return;
+
+        const Recognition = SpeechRecognition || webkitSpeechRecognition;
+
+        if (!Recognition) {
+            console.error("Trình duyệt không hỗ trợ nhận diện giọng nói.");
+            return;
+        }
+
+        const recognition = new Recognition();
+        recognition.lang = 'vi-VN';
+        recognition.continuous = false;
+        recognition.interimResults = false;
+
+        recognition.onstart = () => {
+            setIsListening(true);
+            console.log("🎤 Hệ thống đang lắng nghe nội...");
+        };
+
+        // Fix lỗi 'event' implicitly has an 'any' type
+        recognition.onresult = (event: any) => {
+            const transcript = event.results[0][0].transcript;
+            if (transcript && transcript.trim().length > 1) {
+                console.log("Nội nói:", transcript);
+                handleVoiceChat(transcript); // Gửi sang API chat
+            }
+        };
+
+        recognition.onerror = (event: any) => {
+            console.error("Lỗi Mic:", event.error);
+            setIsListening(false);
+        };
+
+        recognition.onend = () => {
+            setIsListening(false);
+            // Vòng lặp sẽ tự kích hoạt lại nhờ useEffect khi isListening = false
+        };
+
+        try {
             recognition.start();
+        } catch (e) {
+            console.log("Mic đang chạy, không cần start lại.");
         }
     };
-
-    // --- BỔ SUNG LOGIC GHI ÂM MẪU CHO OPENVOICE ---
-    const startSampling = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const recorder = new MediaRecorder(stream);
-            const chunks: Blob[] = [];
-            recorder.ondataavailable = (e) => chunks.push(e.data);
-            recorder.onstop = () => setAudioBlob(new Blob(chunks, { type: 'audio/wav' }));
-            recorder.start();
-            mediaRecorderRef.current = recorder;
-            setIsRecordingSample(true);
-        } catch (err) { alert("Cần quyền truy cập mic!"); }
-    };
-
-    const stopSampling = () => {
-        mediaRecorderRef.current?.stop();
-        setIsRecordingSample(false);
-    };
-
-    const handleAddVoice = async () => {
-        if (!newName || !audioBlob) return;
-        setIsProcessing(true);
-        const formData = new FormData();
-        formData.append("name", newName);
-        formData.append("sample_audio", audioBlob, "sample.wav");
-
-        try {
-            const response = await fetch(`${API_AI_URL}/api/ai/extract-voice`, {
-                method: 'POST',
-                body: formData,
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setRelatives(prev => [...prev, { id: data.voice_id, name: newName }]);
-                setShowAddVoice(false);
-                setNewName("");
-                setAudioBlob(null);
-            }
-        } catch (error) {
-            console.error("Lỗi trích xuất giọng:", error);
-        } finally { setIsProcessing(false); }
-    };
-
     return (
-        <div className="space-y-8 animate-in fade-in duration-700 pb-10">
-            {/* THÔNG BÁO NỔI (ALERT OVERLAY) */}
+        <div className="relative space-y-8 animate-in fade-in duration-700 pb-10 max-w-[1600px] mx-auto">
+
+            {/* 1. TOP ALERT OVERLAY (HIỂN THỊ KHI NGỒI SAI) */}
             {aiData.is_warning && (
-                <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 animate-bounce w-full max-w-md px-4">
-                    <div className="bg-red-500 text-white px-6 py-4 rounded-[2rem] shadow-2xl flex items-center gap-4 border-2 border-white/30 backdrop-blur-lg">
-                        <div className="bg-white/20 p-2 rounded-full">
-                            <span className="text-2xl">⚠️</span>
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-[10px] font-black opacity-80 uppercase tracking-tighter">AI Alert System</span>
-                            <span className="font-bold text-sm leading-tight">
-                                {/* Luân lấy từ aiData.status hoặc aiData.message tùy theo Backend trả về */}
-                                {aiData.status || "Phát hiện tư thế không tốt!"}
-                            </span>
+                <div className="fixed top-10 left-1/2 -translate-x-1/2 z-[100] w-full max-w-lg px-4 animate-in zoom-in slide-in-from-top-10 duration-300">
+                    <div className="relative overflow-hidden bg-white/20 backdrop-blur-2xl border border-white/40 rounded-[2.5rem] shadow-[0_20px_50px_rgba(239,68,68,0.4)] flex items-center p-1">
+                        <div className="absolute inset-0 bg-gradient-to-r from-red-500/20 to-rose-600/20 animate-pulse" />
+                        <div className="relative flex items-center gap-4 w-full bg-white rounded-[2.3rem] p-3 shadow-inner">
+                            <div className="relative">
+                                <div className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-25" />
+                                <div className="relative bg-gradient-to-br from-red-500 to-rose-600 p-3 rounded-full text-white shadow-lg">
+                                    <ShieldAlert size={24} strokeWidth={2.5} />
+                                </div>
+                            </div>
+                            <div className="flex-1">
+                                <div className="flex justify-between items-center mb-0.5">
+                                    <span className="text-[10px] font-black text-red-500 uppercase tracking-widest leading-none">Cảnh báo tư thế</span>
+                                    <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full uppercase">Sức khỏe</span>
+                                </div>
+                                <h4 className="text-base font-black text-slate-800 leading-tight uppercase tracking-tighter">
+                                    {aiData.status.replace(/[🚨⚠️🆘]/g, '').trim()}
+                                </h4>
+                            </div>
+                            <button onClick={() => setAiData(prev => ({ ...prev, is_warning: false }))} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-300">
+                                <X size={18} />
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
-            <audio ref={audioRef} hidden />
 
-            {/* HEADER */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            {/* 2. HEADER SECTION */}
+            <div className="flex flex-col md:flex-row justify-between items-end gap-4 border-b border-slate-100 pb-6">
                 <div>
-                    <h2 className="text-3xl font-black text-slate-700 tracking-tight uppercase">
-                        AI <span className="text-blue-600">Thị Giác & Giao Tiếp</span>
+                    <div className="flex items-center gap-2 mb-1">
+                        <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                        <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">VHU Emotional Companion</span>
+                    </div>
+                    <h2 className="text-4xl font-black text-slate-800 tracking-tight uppercase leading-none">
+                        AI <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Thị Giác</span>
                     </h2>
-                    <p className="text-slate-500 font-medium text-sm">Giám sát an toàn và trò chuyện cùng người thân.</p>
                 </div>
 
-                <div className="flex bg-white p-1 rounded-2xl shadow-sm border border-slate-100">
-                    <button onClick={() => setIsAIOn(true)} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${isAIOn ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400'}`}>PHÂN TÍCH AI: BẬT</button>
-                    <button onClick={() => setIsAIOn(false)} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${!isAIOn ? 'bg-slate-600 text-white shadow-lg' : 'text-slate-400'}`}>CHẾ ĐỘ GỐC</button>
+                <div className="flex bg-slate-100 p-1.5 rounded-[1.5rem] shadow-inner">
+                    <button onClick={() => setIsAIOn(true)} className={`px-6 py-2.5 rounded-[1.2rem] text-[10px] font-black transition-all ${isAIOn ? 'bg-white text-blue-600 shadow-md scale-105' : 'text-slate-400 hover:text-slate-600'}`}>PHÂN TÍCH AI</button>
+                    <button onClick={() => setIsAIOn(false)} className={`px-6 py-2.5 rounded-[1.2rem] text-[10px] font-black transition-all ${!isAIOn ? 'bg-white text-slate-600 shadow-md scale-105' : 'text-slate-400 hover:text-slate-600'}`}>CHẾ ĐỘ GỐC</button>
                 </div>
             </div>
 
+            {/* 3. MAIN CONTENT GRID */}
             <div className="grid grid-cols-12 gap-8">
-                {/* LEFT: VIDEO FEED */}
+                {/* CỘT TRÁI: CAMERA & VOICE CONTROL */}
                 <div className="col-span-12 lg:col-span-8 space-y-6">
-                    <div className="relative bg-slate-900 rounded-[3rem] overflow-hidden shadow-2xl border-4 border-white aspect-video group">
+                    <div className="relative bg-slate-900 rounded-[3.5rem] overflow-hidden shadow-2xl border-[6px] border-white aspect-video group">
 
+                        {/* Feed Camera */}
                         {cameraSource === 'device' ? (
-                            <img
-                                src={`${API_AI_URL}/api/ai/video_feed`}
-                                className="w-full h-full object-cover"
-                                alt="AI Camera"
-                            />
+                            <img src={`${API_AI_URL}/api/ai/video_feed`} className="w-full h-full object-cover" alt="AI Feed" />
                         ) : (
-                            <img src="https://images.unsplash.com/photo-1558002038-1055907df827?auto=format&fit=crop&q=80&w=1200" className="w-full h-full object-cover opacity-80" alt="Home Monitor" />
+                            <img src="https://images.unsplash.com/photo-1558002038-1055907df827?q=80&w=1200" className="w-full h-full object-cover opacity-60" alt="Home" />
                         )}
 
-                        {/* TÍCH HỢP MỚI: VOICE OVERLAY (Hiển thị lời nói AI trên màn hình camera) */}
+                        {/* Phụ đề AI Response */}
                         {aiResponseText && (
-                            <div className="absolute bottom-24 left-1/2 -translate-x-1/2 w-[80%] z-30">
-                                <div className="bg-black/60 backdrop-blur-md text-white p-4 rounded-2xl border border-white/20 animate-in slide-in-from-bottom-4">
-                                    <p className="text-[10px] font-black text-blue-400 uppercase mb-1">{selectedRelative.name} đang nói:</p>
-                                    <p className="text-sm font-medium italic">"{aiResponseText}"</p>
+                            <div className="absolute bottom-28 left-1/2 -translate-x-1/2 w-[85%] z-30">
+                                <div className="bg-black/40 backdrop-blur-xl text-white p-5 rounded-[2rem] border border-white/20 animate-in slide-in-from-bottom-4 shadow-2xl">
+                                    <p className="text-[9px] font-black text-blue-400 uppercase mb-1 tracking-widest">{selectedRelative.name} ĐANG NHẮC:</p>
+                                    <p className="text-lg font-bold italic leading-tight leading-none text-blue-50">"{aiResponseText}"</p>
                                 </div>
                             </div>
                         )}
 
-                        {/* TÍCH HỢP MỚI: NÚT MIC GIAO TIẾP */}
-                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-4">
-                            <button
-                                onClick={startListening}
-                                className={`p-5 rounded-full shadow-2xl transition-all ${isListening ? 'bg-rose-500 animate-pulse scale-110' : 'bg-blue-600 hover:bg-blue-700'}`}
-                            >
-                                {isListening ? <MicOff className="text-white" /> : <Mic className="text-white" />}
-                            </button>
+                        {/* Radar Giao Tiếp Tự Động */}
+                        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30">
+                            <div className="relative">
+                                {/* Sóng radar tỏa ra khi đang nghe */}
+                                {isListening && (
+                                    <>
+                                        <span className="absolute inset-0 rounded-full bg-blue-400 animate-ping opacity-20" />
+                                        <span className="absolute inset-0 rounded-full bg-blue-400 animate-ping opacity-10 delay-300" />
+                                    </>
+                                )}
+
+                                <div className={`p-6 rounded-full shadow-2xl transition-all duration-700 border-4 ${isListening ? 'bg-blue-600 border-blue-400 scale-110' :
+                                    isProcessing ? 'bg-indigo-600 border-indigo-400 animate-pulse' :
+                                        'bg-slate-700 border-slate-600 opacity-50'
+                                    }`}>
+                                    {isProcessing ? (
+                                        <div className="flex gap-1">
+                                            <span className="w-2 h-2 bg-white rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                            <span className="w-2 h-2 bg-white rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                            <span className="w-2 h-2 bg-white rounded-full animate-bounce"></span>
+                                        </div>
+                                    ) : isListening ? (
+                                        <div className="relative">
+                                            <Mic className="text-white animate-pulse" size={28} />
+                                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white"></div>
+                                        </div>
+                                    ) : (
+                                        <MicOff className="text-white/50" size={28} />
+                                    )}
+                                </div>
+
+                                {/* Trạng thái text phía dưới radar */}
+                                <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white drop-shadow-md">
+                                        {isListening ? "Hệ thống đang nghe..." : isProcessing ? "EVE đang trả lời..." : "Chế độ rảnh tay tắt"}
+                                    </span>
+                                </div>
+                            </div>
                         </div>
 
-                        {/* Camera Source Selector */}
-                        <div className="absolute top-20 left-6 z-20 flex gap-3 bg-black/30 backdrop-blur-md p-2 rounded-2xl border border-white/10 shadow-lg">
-
-                            {/* CAMERA THIẾT BỊ (AI Backend) */}
-                            <button
-                                onClick={() => setCameraSource('device')}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black transition-all duration-300 border
-                                         ${cameraSource === 'device'
-                                        ? 'bg-blue-600 text-white border-blue-400 shadow-md scale-105'
-                                        : 'bg-white/10 text-white/70 border-white/20 hover:bg-white/20'
-                                    }`}
-                            >
-                                <Camera size={14} />
-                                CAMERA AI
+                        {/* Chọn nguồn Camera */}
+                        <div className="absolute top-8 left-8 z-20 flex gap-2 bg-black/20 backdrop-blur-md p-1.5 rounded-2xl border border-white/10">
+                            <button onClick={() => setCameraSource('device')} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black transition-all ${cameraSource === 'device' ? 'bg-white text-slate-900 shadow-xl' : 'text-white/70 hover:bg-white/10'}`}>
+                                <Camera size={14} /> CAMERA AI
                             </button>
-
-                            {/* CAMERA PHÒNG KHÁCH (DEMO / CAMERA KHÁC) */}
-                            <button
-                                onClick={() => setCameraSource('home')}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black transition-all duration-300 border
-                                        ${cameraSource === 'home'
-                                        ? 'bg-blue-600 text-white border-blue-400 shadow-md scale-105'
-                                        : 'bg-white/10 text-white/70 border-white/20 hover:bg-white/20'
-                                    }`}
-                            >
-                                <HomeIcon size={14} />
-                                PHÒNG KHÁCH 01
+                            <button onClick={() => setCameraSource('home')} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black transition-all ${cameraSource === 'home' ? 'bg-white text-slate-900 shadow-xl' : 'text-white/70 hover:bg-white/10'}`}>
+                                <HomeIcon size={14} /> PHÒNG KHÁCH
                             </button>
-
                         </div>
                     </div>
 
-                    {/* TÍCH HỢP MỚI: QUẢN LÝ GIỌNG NÓI NGƯỜI THÂN */}
-                    <div className="bg-white/80 backdrop-blur-md p-5 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-4">
+                    {/* Quản lý Giọng nói */}
+                    <div className="bg-white p-6 rounded-[3rem] border border-slate-100 shadow-sm space-y-5">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
-                                <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl text-white shadow-lg shadow-blue-200">
-                                    <Volume2 size={22} />
+                                <div className="p-4 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl text-white shadow-lg shadow-blue-100">
+                                    <Volume2 size={24} />
                                 </div>
                                 <div>
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Hệ thống mô phỏng</p>
-                                    <p className="text-sm font-black text-slate-700">Giọng nói: <span className="text-blue-600">{selectedRelative.name}</span></p>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Thiết lập giọng nói</p>
+                                    <p className="text-base font-black text-slate-800">Mô phỏng: <span className="text-blue-600 uppercase">{selectedRelative.name}</span></p>
                                 </div>
                             </div>
-
-                            {/* NÚT THÊM GIỌNG MỚI */}
-                            <button
-                                onClick={() => setShowAddVoice(true)} // Giả định bạn dùng state showAddVoice để mở modal
-                                className="group flex items-center gap-2 bg-slate-900 hover:bg-blue-600 text-white px-5 py-2.5 rounded-2xl text-[10px] font-black transition-all active:scale-95 shadow-lg shadow-slate-200"
-                            >
-                                <UserPlus size={14} className="group-hover:rotate-12 transition-transform" />
-                                THÊM GIỌNG NGƯỜI THÂN
+                            <button className="flex items-center gap-2 bg-slate-900 hover:bg-blue-600 text-white px-6 py-3 rounded-2xl text-[10px] font-black transition-all shadow-lg">
+                                <UserPlus size={14} /> THÊM GIỌNG MỚI
                             </button>
                         </div>
-
-                        {/* DANH SÁCH GIỌNG NÓI ĐÃ CÓ */}
-                        <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-50">
+                        <div className="flex flex-wrap gap-2 pt-4 border-t border-slate-50">
                             {relatives.map(r => (
-                                <button
-                                    key={r.id}
-                                    onClick={() => setSelectedRelative(r)}
-                                    className={`
-                    relative px-5 py-3 rounded-2xl text-[10px] font-black transition-all flex items-center gap-2
-                    ${selectedRelative.id === r.id
-                                            ? 'bg-blue-600 text-white shadow-md shadow-blue-200 translate-y-[-2px]'
-                                            : 'bg-white text-slate-500 border border-slate-100 hover:bg-slate-50'}
-                `}
-                                >
-                                    {selectedRelative.id === r.id && (
-                                        <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500 border-2 border-white"></span>
-                                        </span>
-                                    )}
-                                    <User size={12} className={selectedRelative.id === r.id ? 'text-blue-200' : 'text-slate-300'} />
+                                <button key={r.id} onClick={() => setSelectedRelative(r)} className={`px-6 py-3.5 rounded-2xl text-[10px] font-black transition-all flex items-center gap-2 border ${selectedRelative.id === r.id ? 'bg-blue-50 border-blue-200 text-blue-600 shadow-sm scale-105' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-200'}`}>
+                                    <User size={14} className={selectedRelative.id === r.id ? 'text-blue-500' : 'text-slate-300'} />
                                     {r.name.toUpperCase()}
                                 </button>
                             ))}
-
-                            {/* HIỆU ỨNG TRẠNG THÁI KHI ĐANG XỬ LÝ AI */}
-                            {isListening && (
-                                <div className="flex items-center gap-2 px-4 py-2 bg-rose-50 rounded-2xl border border-rose-100 animate-pulse">
-                                    <Loader2 size={12} className="text-rose-500 animate-spin" />
-                                    <span className="text-[9px] font-black text-rose-500 uppercase">Hệ thống đang nghe...</span>
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>
 
-                {/* RIGHT: AI BEHAVIOR & EMOTION ANALYSIS */}
+                {/* CỘT PHẢI: ROBOT 3D & PHÂN TÍCH CHỈ SỐ */}
                 <div className="col-span-12 lg:col-span-4 space-y-6">
+                    <div className="h-[600px] w-full bg-slate-50 rounded-[4rem] overflow-hidden border border-slate-100 shadow-xl relative group">
 
-                    {/* TÍCH HỢP MỚI: ROBOT 3D COMPANION */}
-                    <div className="h-[80%] w-full bg-slate-50 rounded-[2.5rem] overflow-hidden border border-slate-100 shadow-xl relative group">
-                        <div className="absolute top-6 left-6 z-10">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">3D Companion Active</p>
-                            <div className="flex items-center gap-2">
-                                <div className={`w-2 h-2 rounded-full ${aiData.is_warning ? 'bg-red-500 animate-ping' : 'bg-emerald-500 animate-pulse'}`}></div>
-                                <span className="text-[11px] font-bold text-slate-600">EVE-01 ONLINE</span>
+                        {/* Status Robot Overlay */}
+                        <div className="absolute top-8 left-8 z-10 flex flex-col gap-1">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">AI Agent Online</p>
+                            <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full w-fit border border-white">
+                                <div className={`w-2 h-2 rounded-full ${aiData.is_warning ? 'bg-red-500 animate-ping' : 'bg-emerald-500 animate-pulse'}`} />
+                                <span className="text-[11px] font-black text-slate-700 uppercase tracking-tighter">EVE-Companion v1</span>
                             </div>
                         </div>
 
+                        {/* 3D Canvas */}
                         <Canvas shadows camera={{ position: [0, 1, 6], fov: 35 }}>
-                            {/* Ánh sáng mạnh mẽ hơn để Robot nổi khối */}
                             <ambientLight intensity={1} />
                             <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={2} castShadow />
-                            <pointLight position={[-10, -10, -10]} intensity={1} />
                             <directionalLight position={[0, 5, 5]} intensity={1} />
-
                             <Suspense fallback={null}>
-                                {/* Thêm Float để Robot bay bổng tự nhiên */}
                                 <Float speed={2} rotationIntensity={0.5} floatIntensity={0.5}>
                                     <EveRobot aiData={aiData} />
                                 </Float>
-                                {/* Environment giúp vật liệu kim loại/nhựa của Robot sáng bóng hơn */}
                                 <Environment preset="city" />
                             </Suspense>
+                            <OrbitControls enableZoom={false} makeDefault />
                         </Canvas>
+
+                        {/* BIO-METRIC DASHBOARD OVERLAY */}
+                        <div className="absolute bottom-8 left-8 right-8 z-10 grid grid-cols-2 gap-3">
+                            {/* Card Cảm xúc */}
+                            <div className="bg-white/80 backdrop-blur-md p-4 rounded-[2rem] border border-white shadow-lg">
+                                <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Cảm xúc của Nội</p>
+                                <div className="flex items-center gap-3">
+                                    <span className="text-3xl filter drop-shadow-md">
+                                        {/* So sánh chính xác với các chuỗi tiếng Việt mà Backend gửi về */}
+                                        {aiData.emotion === "Vui vẻ" ? "😊" :
+                                            aiData.emotion === "Buồn/Mệt mỏi" ? "😟" :
+                                                aiData.emotion === "Căng thẳng" ? "😠" : "😐"}
+                                    </span>
+                                    <span className={`text-[11px] font-black uppercase tracking-tight ${aiData.emotion === "Buồn/Mệt mỏi" ? 'text-orange-500' :
+                                        aiData.emotion === "Căng thẳng" ? 'text-red-500' : 'text-blue-600'
+                                        }`}>
+                                        {aiData.emotion || "Đang phân tích..."}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Card Tư thế */}
+                            <div className={`p-4 rounded-[2rem] border shadow-lg transition-all duration-500 ${aiData.is_warning ? 'bg-gradient-to-br from-red-500 to-rose-600 border-red-400 text-white' : 'bg-white/80 backdrop-blur-md border-white text-slate-800'
+                                }`}>
+                                <p className={`text-[9px] font-black uppercase mb-2 ${aiData.is_warning ? 'text-white/70' : 'text-slate-400'}`}>Tình trạng tư thế</p>
+                                <div className="flex items-center gap-3">
+                                    <div className={`p-1.5 rounded-full ${aiData.is_warning ? 'bg-white/20' : 'bg-slate-100'}`}>
+                                        <Activity size={18} className={aiData.is_warning ? 'animate-bounce' : 'text-blue-500'} />
+                                    </div>
+                                    <span className="text-[11px] font-black uppercase tracking-tight">
+                                        {aiData.is_warning ? "Cần điều chỉnh" : "Bình thường"}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
+                    {/* Quick Tips */}
+                    <div className="bg-blue-600 rounded-[3rem] p-8 text-white relative overflow-hidden group shadow-xl shadow-blue-200">
+                        <div className="absolute top-0 right-0 p-4 opacity-20 group-hover:scale-110 transition-transform">
+                            <Info size={80} />
+                        </div>
+                        <h4 className="text-lg font-black uppercase tracking-tighter mb-2 relative z-10">Mẹo chăm sóc</h4>
+                        <p className="text-blue-100 text-xs font-medium leading-relaxed relative z-10 opacity-90">
+                            "Nội thường hay buồn vào buổi chiều, hãy chọn giọng của <b>{selectedRelative.name}</b> để trò chuyện cùng Nội nhé!"
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>

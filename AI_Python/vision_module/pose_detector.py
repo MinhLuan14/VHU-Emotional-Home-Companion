@@ -2,6 +2,7 @@ import cv2
 import mediapipe as mp
 import math
 import numpy as np
+import time
 from collections import deque
 
 mp_pose = mp.solutions.pose
@@ -9,22 +10,26 @@ mp_drawing = mp.solutions.drawing_utils
 
 class PoseDetector:
     def __init__(self):
-        # Model Complexity 2 là bắt buộc để có độ chính xác cao nhất
         self.pose = mp_pose.Pose(
             static_image_mode=False,
-            model_complexity=2, 
+            model_complexity=2,
             smooth_landmarks=True,
-            min_detection_confidence=0.7, # Tăng ngưỡng để lọc bỏ bóng ma
+            min_detection_confidence=0.7,
             min_tracking_confidence=0.7
         )
         self.lmList = []
         self.prev_points = {}
-        self.smooth_alpha = 0.2
-        self.status_history = deque(maxlen=40) # Tăng lên 40 frame để trạng thái cực kỳ ổn định
-        self.fall_counter = 0 # Bộ đếm xác nhận ngã (tránh báo giả do camera giật)
-        
-        # Lưu trữ lịch sử vận tốc để phân tích xu hướng ngã
+        self.smooth_alpha = 0.3  # Mượt vừa phải, phản ứng nhanh vừa đủ
+        self.status_history = deque(maxlen=30)  # Lấy trạng thái nhiều khung để ổn định
+
+        # Biến cho NGÃ
+        self.fall_counter = 0
         self.velocity_history = deque(maxlen=5)
+        self.last_y = None
+
+        # Biến cho NGỒI LÂU
+        self.sitting_start_time = None
+        self.SITTING_LIMIT = 900  # 15 phút, chỉnh test nhanh xuống 10 giây nếu cần
 
     def findPose(self, img, draw=True):
         imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -37,143 +42,112 @@ class PoseDetector:
             )
         return img
 
-    def getPosition(self, img, draw=True): # Thêm ", draw=True" vào đây
+    def getPosition(self, img, draw=False):
         self.lmList = []
         if not self.results or not self.results.pose_landmarks:
             return self.lmList
         h, w, _ = img.shape
         for i, lm in enumerate(self.results.pose_landmarks.landmark):
             cx, cy = int(lm.x * w), int(lm.y * h)
-            # Làm mượt tọa độ dựa trên độ tin cậy của MediaPipe
+            # Smooth points
             if i in self.prev_points:
                 px, py = self.prev_points[i]
                 cx = int(self.smooth_alpha * cx + (1 - self.smooth_alpha) * px)
                 cy = int(self.smooth_alpha * cy + (1 - self.smooth_alpha) * py)
             self.prev_points[i] = (cx, cy)
-            if draw:
-                cv2.circle(img, (cx, cy), 5, (255, 0, 0), cv2.FILLED)
-                
             self.lmList.append([i, cx, cy, lm.visibility])
         return self.lmList
 
     def get_angle(self, p1, p2, p3):
-        """Tính góc giữa 3 điểm (Dùng vector để chính xác tuyệt đối)"""
         try:
-            a = np.array(p1[:2])
-            b = np.array(p2[:2])
-            c = np.array(p3[:2])
-            ba = a - b
-            bc = c - b
+            a, b, c = np.array(p1[:2]), np.array(p2[:2]), np.array(p3[:2])
+            ba, bc = a - b, c - b
             cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
-            angle = np.degrees(np.arccos(np.clip(cosine_angle, -1.0, 1.0)))
-            return angle
+            return np.degrees(np.arccos(np.clip(cosine_angle, -1.0, 1.0)))
         except:
             return 0
 
-    # --- NHẬN DIỆN CƯỜNG ĐỘ CAO ---
+    # --- NGỒI LÂU ---
+    def check_sitting_duration(self, is_sitting):
+        if is_sitting:
+            if self.sitting_start_time is None:
+                self.sitting_start_time = time.time()
+            elapsed = time.time() - self.sitting_start_time
+            return elapsed > self.SITTING_LIMIT
+        else:
+            self.sitting_start_time = None
+            return False
 
+    # --- NGÃ ---
     def is_falling_advanced(self, pts, sh_dist):
-        """Phát hiện ngã bằng phân tích vector gia tốc đầu"""
         if 0 in pts and 11 in pts and 12 in pts:
             nose_y = pts[0][1]
             shoulder_mid_y = (pts[11][1] + pts[12][1]) / 2
-            
-            # Tính vận tốc tức thời
-            if hasattr(self, 'last_y'):
-                vel = nose_y - self.last_y
-                self.velocity_history.append(vel)
+            if self.last_y is None:
+                self.last_y = nose_y
+            vel = nose_y - self.last_y
+            self.velocity_history.append(vel)
             self.last_y = nose_y
-
-            # Ngã khi: Vận tốc trung bình tăng đột biến VÀ đầu nằm dưới vai
-            if len(self.velocity_history) > 0:
-                avg_vel = sum(self.velocity_history) / len(self.velocity_history)
-                if avg_vel > (sh_dist * 0.4) and nose_y > shoulder_mid_y:
-                    self.fall_counter += 1
-                else:
-                    self.fall_counter = max(0, self.fall_counter - 1)
-            
-            return self.fall_counter > 3 # Phải duy trì trạng thái ngã 3 frame mới báo động
+            avg_vel = sum(self.velocity_history) / len(self.velocity_history)
+            if avg_vel > (sh_dist * 0.42) and nose_y > shoulder_mid_y:  # Vừa nhạy vừa chặt
+                self.fall_counter += 1
+            else:
+                self.fall_counter = max(0, self.fall_counter - 1)
+            return self.fall_counter > 2
         return False
 
-    def is_stooping_advanced(self, pts):
-        """Dùng góc gập lưng thay vì độ dốc đơn thuần"""
-        # Góc tạo bởi Vai - Hông - Đầu gối (hoặc trục đứng giả định)
+    # --- KHOM LƯNG (Ngưỡng 162°) ---
+    def is_stooping_strict(self, pts):
         if 11 in pts and 23 in pts:
-            # Nếu thấy đầu gối thì dùng đầu gối, không thì dùng trục thẳng đứng
             p_knee = pts[25] if 25 in pts and pts[25][2] > 0.5 else (pts[23][0], pts[23][1] + 100, 0)
             angle = self.get_angle(pts[11], pts[23], p_knee)
-            # Lưng thẳng là ~180 độ. Gù/Khom là khi góc này < 150 độ
-            return angle < 155 and pts[11][2] > 0.5
+            return angle < 162 and pts[11][2] > 0.5
         return False
 
-    def is_waving_advanced(self, pts, sh_dist):
-        """Vẫy tay: Phải có sự chuyển động ngang của cổ tay phía trên đầu"""
-        if 15 in pts and 0 in pts:
-            wrist = pts[15]
-            nose = pts[0]
-            # Cổ tay cao hơn mũi và cách xa trục thân người
-            return wrist[1] < nose[1] and abs(wrist[0] - nose[0]) > (sh_dist * 0.5)
+    # --- VẪY TAY ---
+    def is_waving(self, pts, sh_dist):
+        for wrist_id in [15,16]:
+            if wrist_id in pts and 0 in pts:
+                wrist = pts[wrist_id]
+                nose = pts[0]
+                if wrist[1] < nose[1] and abs(wrist[0]-nose[0]) > (sh_dist * 0.45):
+                    return True
         return False
 
+    # --- TỔNG HỢP ---
     def detect_posture(self):
         if not self.lmList or len(self.lmList) < 24:
             return "🔍 Đang quét hệ thống...", (200, 200, 200)
 
-        # Chuyển đổi list điểm thành dict để truy cập nhanh
         pts = {it[0]: (it[1], it[2], it[3]) for it in self.lmList}
-        
-        # Tính sh_dist (khoảng cách 2 vai) làm thước đo động
-        if 11 in pts and 12 in pts:
-            sh_dist = math.hypot(pts[11][0] - pts[12][0], pts[11][1] - pts[12][1])
-        else:
-            sh_dist = 100
+        sh_dist = math.hypot(pts[11][0]-pts[12][0], pts[11][1]-pts[12][1]) if 11 in pts and 12 in pts else 100
 
-        # TÍNH TOÁN CÁC CHỈ SỐ PHỤ ĐỂ PHÂN BIỆT NGỒI/ĐỨNG
-        # Kiểm tra khoảng cách hông và gối (trục Y)
-        is_sitting = False
-        if 23 in pts and 25 in pts:
-            # Nếu khoảng cách dọc từ hông đến gối ngắn lại đáng kể => Đang ngồi
-            is_sitting = abs(pts[23][1] - pts[25][1]) < (sh_dist * 1.2)
+        # Ngồi
+        is_sitting = 23 in pts and 25 in pts and abs(pts[23][1]-pts[25][1]) < (sh_dist*1.3)
+        too_long = self.check_sitting_duration(is_sitting)
 
-        # --- HỆ THỐNG PHÂN CẤP QUYẾT ĐỊNH (PHÂN TẦNG) ---
-        
-        # 1. CẤP ĐỘ KHẨN CẤP: NGÃ
+        # Các tư thế khác
+        is_stooping = self.is_stooping_strict(pts)
+        shoulder_lean = 11 in pts and 12 in pts and abs(pts[11][1]-pts[12][1]) > (sh_dist*0.2)
+
+        # --- ƯU TIÊN ---
         if self.is_falling_advanced(pts, sh_dist):
-            status, color = "🚨 NGUY HIỂM: NGÃ", (0, 0, 255)
-        
-        # 2. CẤP ĐỘ CẦU CỨU: GIƠ TAY CAO (S.O.S)
-        elif 15 in pts and pts[15][1] < pts[0][1]: # Tay trái cao hơn mũi
-            status, color = "🆘 CẦN HỖ TRỢ GẤP", (0, 0, 255)
-
-        # 3. CẤP ĐỘ TƯƠNG TÁC: CHÀO HỎI
-        elif self.is_waving_advanced(pts, sh_dist):
-            status, color = "👋 ĐANG CHÀO ROBOT", (0, 255, 0)
-
-        # 4. CẤP ĐỘ TƯ THẾ (ĐÃ PHÂN BIỆT NGỒI VÀ ĐI)
-        elif self.is_stooping_advanced(pts):
-            if is_sitting:
-                status, color = "⚠️ NGỒI KHOM LƯNG", (0, 165, 255) # Sửa lỗi Luân gặp
-            else:
-                status, color = "🚨 ĐI KHOM NGUY HIỂM", (0, 69, 255)
-
-        # 5. CẤP ĐỘ MỆT MỎI: CHỐNG CẰM / ÔM ĐẦU
-        elif 15 in pts and abs(pts[15][1] - pts[0][1]) < (sh_dist * 0.3):
-            status, color = "😫 NỘI THẤY MỆT Ư?", (255, 165, 0)
-
-        # 6. CẤP ĐỘ CÂN BẰNG: LỆCH VAI
-        elif abs(pts[11][1] - pts[12][1]) > (sh_dist * 0.25):
-            status, color = "⚖️ TƯ THẾ LỆCH VAI", (255, 0, 255)
-
+            status, color = "🚨 NGUY HIỂM: NGÃ", (0,0,255)
+        elif any(pts[i][1] < pts[0][1] for i in [15,16] if i in pts and pts[i][2]>0.5):
+            status, color = "🆘 CẦN HỖ TRỢ GẤP", (0,0,255)
+        elif is_stooping:
+            status, color = ("⚠️ NGỒI KHOM LƯNG", (0,165,255)) if is_sitting else ("🚨 ĐI KHOM NGUY HIỂM", (0,69,255))
+        elif shoulder_lean:
+            status, color = "⚖️ TƯ THẾ LỆCH VAI", (255,0,255)
+        elif too_long:
+            status, color = "⚠️ NỘI NGỒI QUÁ LÂU", (0,120,255)
+        elif self.is_waving(pts, sh_dist):
+            status, color = "👋 ĐANG CHÀO ROBOT", (0,255,0)
+        elif any(i in pts and abs(pts[i][1]-pts[0][1]) < (sh_dist*0.2) for i in [15,16]):
+            status, color = "😫 NỘI THẤY MỆT Ư?", (255,165,0)
         else:
-            if is_sitting:
-                status, color = "🧘 ĐANG NGỒI NGHỈ", (255, 255, 255)
-            else:
-                status, color = "✅ TRẠNG THÁI TỐT", (255, 255, 255)
-
+            status, color = ("🧘 ĐANG NGỒI NGHỈ", (255,255,255)) if is_sitting else ("✅ TRẠNG THÁI TỐT", (255,255,255))
 
         self.status_history.append(status)
-        if len(self.status_history) > 15:
-            self.status_history.popleft()
-            
         final_status = max(set(self.status_history), key=self.status_history.count)
         return final_status, color
