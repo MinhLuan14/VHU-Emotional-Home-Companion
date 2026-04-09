@@ -20,13 +20,29 @@ class EmotionalVoice:
         self.converter.load_ckpt(
             'OpenVoice/checkpoints/converter/checkpoint.pth'
         )
-
-        # ================= LOAD GIỌNG =================
+# ================= LOAD GIỌNG (DÀNH CHO CẤU TRÚC CÙNG CẤP) =================
         import glob
-        folders = glob.glob("processed/*")
+        
+        # 1. Thư mục chứa file hiện tại (thư mục OpenVoice)
+        current_dir = os.path.dirname(os.path.abspath(__file__)) 
+        
+        # 2. Thư mục cha (thư mục AI_Python)
+        parent_dir = os.path.dirname(current_dir) 
+        
+        # 3. Đường dẫn đến processed
+        processed_path = os.path.join(parent_dir, "processed")
+        
+        # 4. Tìm các thư mục con
+        folders = glob.glob(os.path.join(processed_path, "*"))
+
+        print(f"--- KIỂM TRA ĐƯỜNG DẪN ---")
+        print(f"Vị trí file service: {current_dir}")
+        print(f"Vị trí tìm thấy processed: {processed_path}")
+        print(f"Số lượng folder tìm thấy: {len(folders)}")
+        print(f"--------------------------")
 
         if not folders:
-            raise FileNotFoundError("❌ Không tìm thấy thư mục processed")
+            raise FileNotFoundError(f"❌ Không tìm thấy thư mục processed tại: {processed_path}")
 
         target_folder = folders[0]
         target_se_path = os.path.join(target_folder, "se.pth")

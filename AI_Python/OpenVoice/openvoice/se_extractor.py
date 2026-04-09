@@ -19,7 +19,11 @@ model = None
 def split_audio_whisper(audio_path, audio_name, target_dir='processed'):
     global model
     if model is None:
-        model = WhisperModel(model_size, device="cpu", compute_type="int8") 
+        model = WhisperModel(
+        model_size,
+        device="cpu",
+        compute_type="int8"
+)
     audio = AudioSegment.from_file(audio_path)
     max_len = len(audio)
 
@@ -75,8 +79,8 @@ def split_audio_whisper(audio_path, audio_name, target_dir='processed'):
 
 
 def split_audio_vad(audio_path, audio_name, target_dir, split_seconds=10.0):
-    SAMPLE_RATE = 22050
-    audio_vad = get_audio_tensor(audio_path,sr=SAMPLE_RATE)
+    SAMPLE_RATE = 16000
+    audio_vad = get_audio_tensor(audio_path)
     segments = get_vad_segments(
         audio_vad,
         output_sample=True,
@@ -126,23 +130,14 @@ def hash_numpy_array(audio_path):
     base64_value = base64.b64encode(hash_value)
     return base64_value.decode('utf-8')[:16].replace('/', '_^')
 
-def get_se(audio_path, vc_model, target_dir='processed', vad=False):
+def get_se(audio_path, vc_model, target_dir='processed', vad=True):
     device = vc_model.device
     version = vc_model.version
     print("OpenVoice version:", version)
 
-    # BƯỚC 1: Phải tạo tên và đường dẫn TRƯỚC (Đưa 3 dòng này lên trên)
     audio_name = f"{os.path.basename(audio_path).rsplit('.', 1)[0]}_{version}_{hash_numpy_array(audio_path)}"
-    target_folder = os.path.join(target_dir, audio_name)
-    se_path = os.path.join(target_folder, 'se.pth')
+    se_path = os.path.join(target_dir, audio_name, 'se.pth')
 
-    # BƯỚC 2: Bây giờ biến 'target_folder' đã có tên, Python mới xóa được
-    if os.path.exists(target_folder):
-        import shutil
-        shutil.rmtree(target_folder)
-        print(f"--- Đã xóa dữ liệu cũ, bắt đầu trích xuất giọng BTV mới: {audio_name} ---")
-
-    # ... các dòng check if vad: phía dưới giữ nguyên ...
     # if os.path.isfile(se_path):
     #     se = torch.load(se_path).to(device)
     #     return se, audio_name
@@ -159,4 +154,3 @@ def get_se(audio_path, vc_model, target_dir='processed', vad=False):
         raise NotImplementedError('No audio segments found!')
     
     return vc_model.extract_se(audio_segs, se_save_path=se_path), audio_name
-

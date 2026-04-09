@@ -29,7 +29,7 @@ class PoseDetector:
 
         # Biến cho NGỒI LÂU
         self.sitting_start_time = None
-        self.SITTING_LIMIT = 900  # 15 phút, chỉnh test nhanh xuống 10 giây nếu cần
+        self.SITTING_LIMIT = 60  # 15 phút, chỉnh test nhanh xuống 10 giây nếu cần
 
     def findPose(self, img, draw=True):
         imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -73,10 +73,10 @@ class PoseDetector:
             if self.sitting_start_time is None:
                 self.sitting_start_time = time.time()
             elapsed = time.time() - self.sitting_start_time
-            return elapsed > self.SITTING_LIMIT
+            return elapsed > self.SITTING_LIMIT, int(elapsed) # Trả về thêm elapsed
         else:
             self.sitting_start_time = None
-            return False
+            return False, 0
 
     # --- NGÃ ---
     def is_falling_advanced(self, pts, sh_dist):
@@ -117,14 +117,14 @@ class PoseDetector:
     # --- TỔNG HỢP ---
     def detect_posture(self):
         if not self.lmList or len(self.lmList) < 24:
-            return "🔍 Đang quét hệ thống...", (200, 200, 200)
+            return "🔍 Đang quét hệ thống...", (200, 200, 200), 0
 
         pts = {it[0]: (it[1], it[2], it[3]) for it in self.lmList}
         sh_dist = math.hypot(pts[11][0]-pts[12][0], pts[11][1]-pts[12][1]) if 11 in pts and 12 in pts else 100
 
         # Ngồi
         is_sitting = 23 in pts and 25 in pts and abs(pts[23][1]-pts[25][1]) < (sh_dist*1.3)
-        too_long = self.check_sitting_duration(is_sitting)
+        too_long, sitting_seconds = self.check_sitting_duration(is_sitting)
 
         # Các tư thế khác
         is_stooping = self.is_stooping_strict(pts)
@@ -150,4 +150,4 @@ class PoseDetector:
 
         self.status_history.append(status)
         final_status = max(set(self.status_history), key=self.status_history.count)
-        return final_status, color
+        return final_status, color, sitting_seconds

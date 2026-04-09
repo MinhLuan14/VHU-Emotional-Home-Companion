@@ -7,7 +7,7 @@ AudioSegment.ffprobe   = os.path.abspath("ffprobe.exe")
 
 try:
     # Load file m4a
-    audio = AudioSegment.from_file("nguoi_than.m4a", format="m4a")
+    audio = AudioSegment.from_file("nguoi_than.mp3", format="mp3")
 
     # Xuất ra file wav chuẩn cho OpenVoice
     audio = audio.set_frame_rate(22050)

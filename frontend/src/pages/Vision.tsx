@@ -9,13 +9,18 @@ import { Canvas } from '@react-three/fiber';
 import { Suspense } from 'react';
 import { OrbitControls, Environment, Float } from '@react-three/drei';
 import { EveRobot } from '../components/EveRobot';
-
+interface DetectedObject {
+    label: string;
+    bbox: [number, number, number, number];
+}
 interface AIData {
     status: string;
     is_warning: boolean;
     emotion: string;
     back_angle?: number;
     velocity?: number;
+    detected_objects: DetectedObject[];
+    sitting_seconds?: number;
     face?: { x: number; y: number };
 }
 
@@ -35,6 +40,8 @@ const Vision: React.FC = () => {
         status: "Đang kết nối...",
         is_warning: false,
         emotion: "Ổn định",
+        detected_objects: [], // Khởi tạo mảng rỗng để không bị lỗi
+        sitting_seconds: 0,
     });
 
     const [relatives, setRelatives] = useState<Relative[]>([
@@ -50,30 +57,58 @@ const Vision: React.FC = () => {
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const [isHandsFree, setIsHandsFree] = useState(true);
     const [isSpeaking, setIsSpeaking] = useState(false);
-    useEffect(() => {
-        let timeoutId: NodeJS.Timeout;
+    const [lastFrame, setLastFrame] = useState("");
+    const socketRef = useRef<WebSocket | null>(null);
 
-        const fetchStatus = async () => {
+    useEffect(() => {
+        if (socketRef.current) return; // 🛑 CHỐNG DOUBLE CONNECT
+
+        const baseUrl = new URL(API_AI_URL);
+        const protocol = baseUrl.protocol === "https:" ? "wss:" : "ws:";
+        const wsUrl = `${protocol}//${baseUrl.host}/ws/video`;
+
+        const socket = new WebSocket(wsUrl);
+        socketRef.current = socket;
+
+        socket.onopen = () => {
+            console.log("✅ WS connected");
+        };
+
+        socket.onmessage = (event) => {
             try {
-                const response = await fetch(`${API_AI_URL}/api/ai/status`);
-                if (response.ok) {
-                    const data = await response.json();
-                    setAiData({
-                        status: data.status.status,
-                        is_warning: data.status.is_warning,
-                        emotion: data.status.emotion,
-                        face: data.face
-                    });
+                const data = JSON.parse(event.data);
+
+                // 🛑 CHECK NULL TRƯỚC
+                if (data.frame) {
+                    setLastFrame(data.frame);
                 }
+
+                setAiData({
+                    status: data.status?.status || "",
+                    is_warning: data.status?.is_warning || false,
+                    emotion: data.status?.emotion || "",
+                    detected_objects: data.status?.full_objects_data || [],
+                    sitting_seconds: data.status?.sitting_seconds || 0,
+                    face: data.face || { x: 0.5, y: 0.5 }
+                });
             } catch (error) {
-                console.error("Connection lost:", error);
-            } finally {
-                timeoutId = setTimeout(fetchStatus, 500);
+                console.error("❌ WS parse error:", error);
+            }
+        };
+        socket.onerror = (err) => {
+            console.error("❌ WS error:", err);
+        };
+        socket.onclose = () => {
+            console.log("🔌 WS closed");
+            socketRef.current = null;
+        };
+        return () => {
+            if (socketRef.current) {
+                socketRef.current.close();
+                socketRef.current = null;
             }
         };
 
-        fetchStatus();
-        return () => clearTimeout(timeoutId);
     }, []);
 
     const handleVoiceChat = async (transcript: string) => {
@@ -246,12 +281,87 @@ const Vision: React.FC = () => {
                 {/* CỘT TRÁI: CAMERA & VOICE CONTROL */}
                 <div className="col-span-12 lg:col-span-8 space-y-6">
                     <div className="relative bg-slate-900 rounded-[3.5rem] overflow-hidden shadow-2xl border-[6px] border-white aspect-video group">
-
-                        {/* Feed Camera */}
+                        {aiData && aiData.sitting_seconds !== undefined && aiData.sitting_seconds > 0 && (
+                            <div className="absolute top-8 right-8 z-30">
+                                <div className="bg-orange-500/20 backdrop-blur-md border-2 border-orange-500 p-3 rounded-2xl flex flex-col items-end">
+                                    <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-1">
+                                        Thời gian ngồi
+                                    </span>
+                                    <div className="flex items-baseline gap-1">
+                                        <span className="text-3xl font-black text-white tabular-nums">
+                                            {/* Dùng Number() hoặc || 0 để đảm bảo luôn có số */}
+                                            {aiData.sitting_seconds || 0}
+                                        </span>
+                                        <span className="text-sm font-bold text-orange-500">giây</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {/* Feed Camera & Digital Twin Overlay */}
                         {cameraSource === 'device' ? (
-                            <img src={`${API_AI_URL}/api/ai/video_feed`} className="w-full h-full object-cover" alt="AI Feed" />
+                            <div className="relative w-full h-full overflow-hidden bg-black">
+                                {/* 1. Luồng Video gốc từ Backend */}
+                                <img
+                                    src={
+                                        lastFrame
+                                            ? `data:image/jpeg;base64,${lastFrame}`
+                                            : "/no-signal.png"
+                                    }
+                                    className="w-full h-full object-cover"
+                                />
+
+                                {/* 2. Hiệu ứng Radar Scanning (Chạy lên xuống) */}
+                                <div className="absolute inset-0 pointer-events-none">
+                                    <div className="w-full h-[2px] bg-cyan-400/30 shadow-[0_0_15px_rgba(34,211,238,0.8)] animate-scan" />
+                                </div>
+
+                                {/* 3. Lớp phủ Bounding Boxes (Digital Twin) */}
+                                {aiData.detected_objects && aiData.detected_objects.map((obj, index) => {
+                                    const [x1, y1, x2, y2] = obj.bbox;
+                                    const isTV = obj.label.toLowerCase().includes('tv');
+                                    const isChair = obj.label.toLowerCase().includes('ghế');
+                                    const isSittingOn = isChair && aiData.sitting_seconds && aiData.sitting_seconds > 0;
+
+                                    return (
+                                        <div
+                                            key={index}
+                                            className="absolute transition-all duration-500 pointer-events-none"
+                                            style={{
+                                                left: `${(x1 / 640) * 100}%`, // Chuyển sang % để khớp với object-cover
+                                                top: `${(y1 / 480) * 100}%`,
+                                                width: `${((x2 - x1) / 640) * 100}%`,
+                                                height: `${((y2 - y1) / 480) * 100}%`,
+                                                border: `2px solid ${isTV ? '#3b82f6' : isSittingOn ? '#f97316' : '#22c55e'}`,
+                                                boxShadow: isSittingOn ? '0 0 20px rgba(249, 115, 22, 0.6)' : 'none',
+                                            }}
+                                        >
+                                            {/* Tag tên và đồng hồ */}
+                                            <div className={`absolute -top-6 left-0 px-2 py-0.5 rounded-t text-[10px] font-bold text-white flex items-center gap-1
+                        ${isTV ? 'bg-blue-500' : isSittingOn ? 'bg-orange-500' : 'bg-green-500'}`}>
+                                                {obj.label.toUpperCase()}
+                                                {isSittingOn && (
+                                                    <span className="bg-white text-orange-600 px-1 rounded animate-pulse">
+                                                        ⏳ {aiData.sitting_seconds}s
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+
+                                {/* 4. Cảnh báo đỏ nếu có Warning (Ngã, Khom lưng...) */}
+                                {aiData.is_warning && (
+                                    <div className="absolute inset-0 border-[10px] border-red-500/40 animate-pulse pointer-events-none shadow-[inset_0_0_50px_rgba(239,68,68,0.4)]" />
+                                )}
+                            </div>
                         ) : (
-                            <img src="https://images.unsplash.com/photo-1558002038-1055907df827?q=80&w=1200" className="w-full h-full object-cover opacity-60" alt="Home" />
+                            <div className="relative w-full h-full bg-slate-900 flex items-center justify-center">
+                                <img src="https://images.unsplash.com/photo-1558002038-1055907df827?q=80&w=1200" className="w-full h-full object-cover opacity-40" alt="Home" />
+                                <div className="absolute text-slate-400 flex flex-col items-center">
+                                    <Loader2 className="animate-spin mb-2" />
+                                    <span className="text-sm">Đang kết nối camera nhà...</span>
+                                </div>
+                            </div>
                         )}
 
                         {/* Phụ đề AI Response */}
@@ -355,17 +465,31 @@ const Vision: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* 3D Canvas */}
-                        <Canvas shadows camera={{ position: [0, 1, 6], fov: 35 }}>
+                        <Canvas
+                            shadows
+                            camera={{ position: [0, 1, 6], fov: 35 }}
+                            // Thêm đoạn xử lý này vào nè Luân
+                            onCreated={({ gl }) => {
+                                gl.shadowMap.type = 1; // 1 tương đương với THREE.PCFShadowMap
+                            }}
+                        >
                             <ambientLight intensity={1} />
-                            <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={2} castShadow />
+                            <spotLight
+                                position={[10, 10, 10]}
+                                angle={0.15}
+                                penumbra={1}
+                                intensity={2}
+                                castShadow
+                            />
                             <directionalLight position={[0, 5, 5]} intensity={1} />
+
                             <Suspense fallback={null}>
                                 <Float speed={2} rotationIntensity={0.5} floatIntensity={0.5}>
                                     <EveRobot aiData={aiData} />
                                 </Float>
                                 <Environment preset="city" />
                             </Suspense>
+
                             <OrbitControls enableZoom={false} makeDefault />
                         </Canvas>
 
