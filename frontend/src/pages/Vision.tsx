@@ -2,12 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import Webcam from 'react-webcam';
 import {
     Camera, ShieldAlert, Activity, Home as HomeIcon, User,
-    Mic, MicOff, Volume2, UserPlus, Loader2, X, Info
+    Mic, MicOff, Volume2, UserPlus, Loader2, X, Info, Monitor, Clock
 } from 'lucide-react';
 import { API_AI_URL } from '../config';
 import { Canvas } from '@react-three/fiber';
 import { Suspense } from 'react';
-import { OrbitControls, Environment, Float } from '@react-three/drei';
+import { OrbitControls, Environment, Float, ContactShadows } from '@react-three/drei';
 import { EveRobot } from '../components/EveRobot';
 interface DetectedObject {
     label: string;
@@ -83,14 +83,33 @@ const Vision: React.FC = () => {
                     setLastFrame(data.frame);
                 }
 
-                setAiData({
-                    status: data.status?.status || "",
-                    is_warning: data.status?.is_warning || false,
-                    emotion: data.status?.emotion || "",
-                    detected_objects: data.status?.full_objects_data || [],
-                    sitting_seconds: data.status?.sitting_seconds || 0,
-                    face: data.face || { x: 0.5, y: 0.5 }
-                });
+                socket.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.frame) setLastFrame(data.frame);
+
+                        // Kiểm tra xem status có phải là Object chứa description không
+                        const statusText = typeof data.status?.status === 'object'
+                            ? data.status.status.description  // Lấy chuỗi mô tả nếu nó là object
+                            : (data.status?.status || "");
+
+                        // Kiểm tra emotion tương tự
+                        const emotionText = typeof data.status?.emotion === 'object'
+                            ? data.status.emotion.emotion_text
+                            : (data.status?.emotion || "Ổn định");
+
+                        setAiData({
+                            status: String(statusText),
+                            is_warning: !!data.status?.is_warning,
+                            emotion: String(emotionText),
+                            detected_objects: data.status?.full_objects_data || [],
+                            sitting_seconds: data.status?.sitting_seconds || 0,
+                            face: data.face || { x: 0.5, y: 0.5 }
+                        });
+                    } catch (error) {
+                        console.error("❌ WS parse error:", error);
+                    }
+                };
             } catch (error) {
                 console.error("❌ WS parse error:", error);
             }
@@ -247,7 +266,10 @@ const Vision: React.FC = () => {
                                     <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full uppercase">Sức khỏe</span>
                                 </div>
                                 <h4 className="text-base font-black text-slate-800 leading-tight uppercase tracking-tighter">
-                                    {aiData.status.replace(/[🚨⚠️🆘]/g, '').trim()}
+                                    {/* Đảm bảo nó là string trước khi dùng replace */}
+                                    {typeof aiData.status === 'string'
+                                        ? aiData.status.replace(/[🚨⚠️🆘]/g, '').trim()
+                                        : "Đang phân tích..."}
                                 </h4>
                             </div>
                             <button onClick={() => setAiData(prev => ({ ...prev, is_warning: false }))} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-300">
@@ -323,28 +345,57 @@ const Vision: React.FC = () => {
                                     const isSittingOn = isChair && aiData.sitting_seconds && aiData.sitting_seconds > 0;
 
                                     return (
-                                        <div
-                                            key={index}
-                                            className="absolute transition-all duration-500 pointer-events-none"
+                                        <div key={index} className="absolute pointer-events-none transition-all duration-300 ease-out"
                                             style={{
-                                                left: `${(x1 / 640) * 100}%`, // Chuyển sang % để khớp với object-cover
+                                                // Luân dùng left/top/width/height dạng % là chuẩn nhất cho Responsive
+                                                left: `${(x1 / 640) * 100}%`,
                                                 top: `${(y1 / 480) * 100}%`,
                                                 width: `${((x2 - x1) / 640) * 100}%`,
                                                 height: `${((y2 - y1) / 480) * 100}%`,
-                                                border: `2px solid ${isTV ? '#3b82f6' : isSittingOn ? '#f97316' : '#22c55e'}`,
-                                                boxShadow: isSittingOn ? '0 0 20px rgba(249, 115, 22, 0.6)' : 'none',
+
+                                                // Đổi màu Border linh hoạt
+                                                border: `2px solid ${isTV ? '#3b82f6' :
+                                                    isSittingOn ? '#f97316' :
+                                                        '#22c55e'
+                                                    }`,
+
+                                                // Hiệu ứng Glow khi đang ngồi hoặc có cảnh báo
+                                                boxShadow: isSittingOn
+                                                    ? '0 0 15px rgba(249, 115, 22, 0.5), inset 0 0 10px rgba(249, 115, 22, 0.2)'
+                                                    : 'none',
+                                                borderRadius: '4px',
+                                                zIndex: isSittingOn ? 40 : 30
                                             }}
                                         >
-                                            {/* Tag tên và đồng hồ */}
-                                            <div className={`absolute -top-6 left-0 px-2 py-0.5 rounded-t text-[10px] font-bold text-white flex items-center gap-1
-                        ${isTV ? 'bg-blue-500' : isSittingOn ? 'bg-orange-500' : 'bg-green-500'}`}>
-                                                {obj.label.toUpperCase()}
+                                            {/* Label Tag - Đưa lên trên cạnh của Box */}
+                                            <div className={`
+                                                    absolute -top-6 left-0 
+                                                    px-2 py-0.5 
+                                                    rounded-t-md 
+                                                    text-[10px] font-black text-white 
+                                                    flex items-center gap-1.5
+                                                    backdrop-blur-sm
+                                                    ${isTV ? 'bg-blue-600/90' : isSittingOn ? 'bg-orange-600/90' : 'bg-green-600/90'}
+                                                `}>
+                                                {/* Icon nhỏ minh họa cho xịn */}
+                                                {isTV ? <Monitor size={10} /> : isSittingOn ? <User size={10} /> : <Activity size={10} />}
+
+                                                <span>{obj.label.toUpperCase()}</span>
+
+                                                {/* Hiển thị thời gian ngồi trực tiếp trên đầu object */}
                                                 {isSittingOn && (
-                                                    <span className="bg-white text-orange-600 px-1 rounded animate-pulse">
-                                                        ⏳ {aiData.sitting_seconds}s
+                                                    <span className="ml-1 bg-white text-orange-600 px-1.5 rounded-sm animate-pulse flex items-center gap-0.5">
+                                                        <Clock size={8} />
+                                                        {aiData.sitting_seconds}s
                                                     </span>
                                                 )}
                                             </div>
+
+                                            {/* Các góc của Box (Tạo cảm giác công nghệ AI Scan) */}
+                                            <div className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-inherit -mt-[2px] -ml-[2px]" />
+                                            <div className="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-inherit -mt-[2px] -mr-[2px]" />
+                                            <div className="absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-inherit -mb-[2px] -ml-[2px]" />
+                                            <div className="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-inherit -mb-[2px] -mr-[2px]" />
                                         </div>
                                     );
                                 })}

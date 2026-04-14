@@ -9,8 +9,10 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AmiFrameDto {
-    private String posture; // Tư thế (Ngồi, Đứng, Ngã...)
-    private List<String> objects; // Danh sách vật thể quanh nội (điện thoại, ly nước...)
-    private String emotion; // Cảm xúc (Vui, Buồn, Bình thường...)
-    private int sittingSeconds; // Thời gian ngồi (giây)
+    private String userId;
+    private String posture;
+    private List<String> objects;
+    private String emotion;
+    private int sittingSeconds;
+    private boolean warning;
 }

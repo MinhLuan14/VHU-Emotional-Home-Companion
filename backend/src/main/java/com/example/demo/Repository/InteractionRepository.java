@@ -1,8 +1,10 @@
 package com.example.demo.Repository;
 
-import com.example.demo.Entity.Interaction;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
+
+import com.example.demo.entity.Interaction;
+
 import java.time.LocalDateTime;
 import java.util.List;
 

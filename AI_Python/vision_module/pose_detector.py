@@ -73,26 +73,35 @@ class PoseDetector:
             if self.sitting_start_time is None:
                 self.sitting_start_time = time.time()
             elapsed = time.time() - self.sitting_start_time
-            return elapsed > self.SITTING_LIMIT, int(elapsed) # Trả về thêm elapsed
+            return elapsed > self.SITTING_LIMIT, int(elapsed)
         else:
             self.sitting_start_time = None
             return False, 0
 
-    # --- NGÃ ---
     def is_falling_advanced(self, pts, sh_dist):
-        if 0 in pts and 11 in pts and 12 in pts:
+        if 0 in pts and 23 in pts and 24 in pts:
+            # 1. Theo dõi vận tốc rơi của mũi (Nose)
             nose_y = pts[0][1]
-            shoulder_mid_y = (pts[11][1] + pts[12][1]) / 2
-            if self.last_y is None:
-                self.last_y = nose_y
+            if self.last_y is None: self.last_y = nose_y
             vel = nose_y - self.last_y
             self.velocity_history.append(vel)
             self.last_y = nose_y
             avg_vel = sum(self.velocity_history) / len(self.velocity_history)
-            if avg_vel > (sh_dist * 0.42) and nose_y > shoulder_mid_y:  # Vừa nhạy vừa chặt
+
+            # 2. Kiểm tra tỉ lệ cơ thể (Height vs Width)
+            # Khi đứng: Cao > Rộng. Khi ngã: Rộng thường > Cao (hoặc bằng)
+            y_coords = [p[1] for p in pts.values()]
+            x_coords = [p[0] for p in pts.values()]
+            body_height = max(y_coords) - min(y_coords)
+            body_width = max(x_coords) - min(x_coords)
+            
+            # Ngưỡng ngã: Vận tốc rơi nhanh + Cơ thể nằm ngang hoặc mũi xuống quá thấp so với hông
+            hip_y = (pts[23][1] + pts[24][1]) / 2
+            if (avg_vel > sh_dist * 0.5) or (nose_y > hip_y):
                 self.fall_counter += 1
             else:
                 self.fall_counter = max(0, self.fall_counter - 1)
+                
             return self.fall_counter > 2
         return False
 
@@ -115,39 +124,72 @@ class PoseDetector:
         return False
 
     # --- TỔNG HỢP ---
-    def detect_posture(self):
+    def detect_posture(self, frame=None):
+        # 1. Kiểm tra dữ liệu đầu vào
         if not self.lmList or len(self.lmList) < 24:
-            return "🔍 Đang quét hệ thống...", (200, 200, 200), 0
+            return "🔍 Đang quét hệ thống...", (200, 200, 200), 0, {}
 
+        # Chuyển lmList sang dictionary để truy xuất nhanh
         pts = {it[0]: (it[1], it[2], it[3]) for it in self.lmList}
+        
+        # Tính khoảng cách vai
         sh_dist = math.hypot(pts[11][0]-pts[12][0], pts[11][1]-pts[12][1]) if 11 in pts and 12 in pts else 100
 
-        # Ngồi
-        is_sitting = 23 in pts and 25 in pts and abs(pts[23][1]-pts[25][1]) < (sh_dist*1.3)
+        # 2. Tính toán trạng thái
+        is_sitting = 23 in pts and 25 in pts and abs(pts[23][1]-pts[25][1]) < (sh_dist * 1.3)
         too_long, sitting_seconds = self.check_sitting_duration(is_sitting)
-
-        # Các tư thế khác
+        
         is_stooping = self.is_stooping_strict(pts)
-        shoulder_lean = 11 in pts and 12 in pts and abs(pts[11][1]-pts[12][1]) > (sh_dist*0.2)
+        is_falling = self.is_falling_advanced(pts, sh_dist)
+        
+        shoulder_lean = 11 in pts and 12 in pts and abs(pts[11][1]-pts[12][1]) > (sh_dist * 0.25)
 
-        # --- ƯU TIÊN ---
-        if self.is_falling_advanced(pts, sh_dist):
-            status, color = "🚨 NGUY HIỂM: NGÃ", (0,0,255)
-        elif any(pts[i][1] < pts[0][1] for i in [15,16] if i in pts and pts[i][2]>0.5):
-            status, color = "🆘 CẦN HỖ TRỢ GẤP", (0,0,255)
+        # 3. PRIORITY LOGIC
+        if is_falling:
+            status, color = "🚨 NGUY HIỂM: NGÃ", (0, 0, 255)
+            self.sitting_start_time = None 
+            
+        elif any(pts[i][1] < pts[0][1] for i in [15, 16] if i in pts and pts[i][2] > 0.5):
+            status, color = "🆘 CẦN HỖ TRỢ GẤP", (0, 0, 255)
+
         elif is_stooping:
-            status, color = ("⚠️ NGỒI KHOM LƯNG", (0,165,255)) if is_sitting else ("🚨 ĐI KHOM NGUY HIỂM", (0,69,255))
-        elif shoulder_lean:
-            status, color = "⚖️ TƯ THẾ LỆCH VAI", (255,0,255)
-        elif too_long:
-            status, color = "⚠️ NỘI NGỒI QUÁ LÂU", (0,120,255)
-        elif self.is_waving(pts, sh_dist):
-            status, color = "👋 ĐANG CHÀO ROBOT", (0,255,0)
-        elif any(i in pts and abs(pts[i][1]-pts[0][1]) < (sh_dist*0.2) for i in [15,16]):
-            status, color = "😫 NỘI THẤY MỆT Ư?", (255,165,0)
-        else:
-            status, color = ("🧘 ĐANG NGỒI NGHỈ", (255,255,255)) if is_sitting else ("✅ TRẠNG THÁI TỐT", (255,255,255))
+            if is_sitting:
+                status, color = "⚠️ NGỒI KHOM LƯNG", (0, 165, 255)
+            else:
+                status, color = "🚨 ĐI KHOM NGUY HIỂM", (0, 69, 255)
 
+        elif shoulder_lean:
+            status, color = "⚖️ TƯ THẾ LỆCH VAI", (255, 0, 255)
+
+        elif too_long:
+            status, color = "⚠️ NỘI NGỒI QUÁ LÂU", (0, 120, 255)
+
+        elif self.is_waving(pts, sh_dist):
+            status, color = "👋 ĐANG CHÀO ROBOT", (0, 255, 0)
+            
+        elif any(i in pts and abs(pts[i][1] - pts[0][1]) < (sh_dist * 0.2) for i in [15, 16]):
+            status, color = "😫 NỘI THẤY MỆT Ư?", (255, 165, 0)
+            
+        else:
+            if is_sitting:
+                status, color = "🧘 ĐANG NGỒI NGHỈ", (255, 255, 255)
+            else:
+                status, color = "✅ TRẠNG THÁI TỐT", (255, 255, 255)
+
+        # 4. SMOOTHING
         self.status_history.append(status)
         final_status = max(set(self.status_history), key=self.status_history.count)
-        return final_status, color, sitting_seconds
+
+        # ================== THÊM POSE_CTX ==================
+        pose_ctx = {
+            "is_sitting": is_sitting,
+            "is_too_long": too_long,
+            "is_stooping": is_stooping,
+            "is_falling": is_falling,
+            "shoulder_lean": shoulder_lean,
+            "is_waving": self.is_waving(pts, sh_dist),
+            "sitting_seconds": sitting_seconds,
+            "status": final_status
+        }
+
+        return final_status, color, sitting_seconds, pose_ctx

@@ -17,14 +17,14 @@ export function EveRobot({ aiData }: EveRobotProps) {
     const eyesMeshRef = useRef<THREE.Mesh | null>(null)
     const handLRef = useRef<THREE.Object3D | null>(null)
     const handRRef = useRef<THREE.Object3D | null>(null)
-
+    const earsMeshRef = useRef<THREE.Mesh | null>(null);
+    const ringsRef = useRef<(THREE.Mesh | null)[]>([]);
     const { scene } = useGLTF('/models/robot.glb') as any
 
     const [audio, setAudio] = useState<HTMLAudioElement | null>(null)
     const [face, setFace] = useState({ x: 0.5, y: 0.5 })
     const [audioUrl, setAudioUrl] = useState("")
-    const ringTopRef = useRef<THREE.Mesh | null>(null)
-    const ringBottomRef = useRef<THREE.Mesh | null>(null)
+
 
     useEffect(() => {
         if (!scene) return
@@ -39,18 +39,27 @@ export function EveRobot({ aiData }: EveRobotProps) {
                     child.material.emissive = child.material.color;
                     child.material.emissiveIntensity = 1; // Tăng mạnh để Bloom đẹp hơn
                 }
-                if (child.name.includes("Ring_Top")) ringTopRef.current = child;
-                if (child.name.includes("Ring_Bottom")) ringBottomRef.current = child;
                 if (child.name === "Mouth_Blue_Light_0") mouthMeshRef.current = child
                 if (child.name === "Eyes_Blue_Light_0") eyesMeshRef.current = child
+                if (child.isMesh && child.name.includes("Wave")) {
+                    child.material = child.material.clone();
+
+                    // Regex \d+ tìm số bất kỳ: "Wave" -> 0, "Wave.001" -> 1
+                    const match = child.name.match(/\d+/);
+                    const index = match ? parseInt(match[0]) : 0;
+
+                    ringsRef.current[index] = child;
+
+                    const mat = child.material as THREE.MeshStandardMaterial;
+                    mat.emissive = new THREE.Color(0x00ffff);
+                    mat.emissiveIntensity = 2;
+                }
             }
-            if (child.name === "Hand_origin") handLRef.current = child
-            if (child.name === "Hand_origin.002") handRRef.current = child
+            if (child.name === "hANDS") handLRef.current = child;
+            if (child.name === "hANDS.002") handRRef.current = child;
         })
     }, [scene])
 
-    // 👋 THÊM BIẾN REF ĐỂ ĐIỀU KHIỂN
-    const earsMeshRef = useRef<THREE.Mesh | null>(null);
 
     useEffect(() => {
         if (!scene) return;
@@ -61,15 +70,11 @@ export function EveRobot({ aiData }: EveRobotProps) {
                     earsMeshRef.current = child;
                     child.material = child.material.clone();
                     const mat = child.material as THREE.MeshStandardMaterial;
-
-                    mat.color.set(0x0a0a0a); // Đen rất sâu
-                    mat.roughness = 0.05;   // Bóng bẩy phản chiếu ánh sáng
-                    mat.metalness = 0.2;     // Một chút ánh kim
-
-                    // 3. THÊM HIỆU ỨNG ÁNH SÁNG EMISSIVE (Tự phát sáng)
-                    // Làm cho tai như một thanh Neon màu xanh Blue nhạt
+                    mat.color.set(0x0a0a0a);
+                    mat.roughness = 0.05;
+                    mat.metalness = 0.2;
                     mat.emissive.set(0x00aaff);
-                    mat.emissiveIntensity = 1.0; // Biên độ ban đầu
+                    mat.emissiveIntensity = 1.0;
                 }
             }
         });
@@ -106,23 +111,53 @@ export function EveRobot({ aiData }: EveRobotProps) {
             // Tạo cảm giác tai đang thở, Robot đang ở chế độ Idle
             earsMat.emissiveIntensity = 1.5 + Math.cos(t * 1.5) * 1.0;
         }
-        if (ringTopRef.current) {
-            // Nội thử đổi .y thành .z hoặc .x nếu vẫn chưa xoay nhen
-            ringTopRef.current.rotation.z = t * 2.0;
-            ringTopRef.current.position.y = Math.sin(t * 1.5) * 0.1;
+        ringsRef.current.filter(Boolean).forEach((ring, index) => {
+            if (!ring) return;
 
-            const mat = ringTopRef.current.material as THREE.MeshStandardMaterial;
-            mat.emissiveIntensity = 5 + Math.sin(t * 10) * 2;
-        }
+            const t = state.clock.elapsedTime;
 
-        // Vòng dưới: Xoay ngược chiều cho đẹp
-        if (ringBottomRef.current) {
-            ringBottomRef.current.rotation.z = -t * 1.5;
-            ringBottomRef.current.position.y = Math.sin(t * 1.5 - 0.5) * 0.06;
+            // --- 1. Giữ nguyên logic di chuyển và xoay của Luân ---
+            ring.position.x = 0;
+            ring.position.y = -0.2; // Đặt vị trí Y cố định (hoặc dùng ring.position.y = 0; tùy robot)
 
-            const mat = ringBottomRef.current.material as THREE.MeshStandardMaterial;
-            mat.emissiveIntensity = 3 + Math.cos(t * 8) * 1.5;
-        }
+            ring.rotation.x = 0;
+            ring.rotation.y = 0;
+            ring.rotation.z = t * (2 + index);
+
+            const verticalRange = 1.8; // Độ xa quãng đường đi xuống
+            const speed = 2.0;
+            const offset = ((t * speed) + (index * 0.4)) % verticalRange;
+            ring.position.z = -offset; // Giữ nguyên trục Z bay xuống của Luân
+
+            // Tính progress (tiến trình từ 0 đến 1)
+            const progress = offset / verticalRange;
+
+            // --- 2. SỬA MÀU SẮC & NEON TẠI ĐÂY ---
+            const mat = ring.material as THREE.MeshStandardMaterial;
+            mat.transparent = true;
+            mat.opacity = 1 - progress; // Mờ dần khi xuống dưới
+
+            // Cài đặt dải màu (HUE): Blue đậm đến Tím
+            // Xanh Blue neon: 0.65 -> Tím: 0.85
+            const startHue = 0.65;
+            const endHue = 0.85;
+
+            // Tính hue hiện tại: Sẽ tịnh tiến dần từ 0.65 đến 0.85 dựa trên progress
+            const currentHue = startHue + (progress * (endHue - startHue));
+
+            // Thêm hiệu ứng nhấp nháy cho sinh động
+            const baseIntensity = 5;
+            const flicker = Math.sin(t * 10 + index) * 2;
+            const intensity = baseIntensity + flicker;
+
+            // setHSL(hue, bão hòa, độ sáng)
+            mat.emissive.setHSL(currentHue, 0.9, 0.5); // Tăng bão hòa (0.9) cho tươi màu neon
+            mat.emissiveIntensity = intensity;
+
+            // --- 3. Giữ nguyên hiệu ứng thu nhỏ của Luân ---
+            ring.scale.setScalar(1.4 * (1 - progress * 0.6));
+        });
+
         // 👄 NHÉP MIỆNG (Noise logic mượt mà)
         if (mouthMeshRef.current) {
             let targetScale = 1.0
@@ -156,24 +191,24 @@ export function EveRobot({ aiData }: EveRobotProps) {
             // 3. Đưa ra vào một chút (trục Z)
             handLRef.current.rotation.z = -0.1 + Math.cos(t * 0.8) * 0.03;
         }
-
         if (handRRef.current) {
-            // Tương tự cho tay phải, nhưng Luân có thể đảo ngược Cosine để 2 tay không bị đơ
-            handRRef.current.rotation.x = Math.sin(t * 1.5) * 0.1;
-            handRRef.current.position.y = Math.sin(t * 1.5) * 0.05;
-            handRRef.current.rotation.z = 0.1 - Math.cos(t * 0.8) * 0.03;
-        }
-        const waveZ = Math.PI / 2 + Math.sin(t * 10) * 0.25; // Vẫy trục Z
-        const idleZ = 0.1 - Math.cos(t * 0.8) * 0.03; // Trạng thái nghỉ
+            const waveZ = Math.PI / 2 + Math.sin(t * 10) * 0.25;
+            const idleZ = 0.1 - Math.cos(t * 0.8) * 0.03;
 
-        if (handRRef.current) {
-            // Nếu đang chào thì nhắm đến waveZ, nếu không thì về idleZ
             const targetZ = isGreeting ? waveZ : idleZ;
             const targetX = isGreeting ? -0.4 : (Math.sin(t * 1.5) * 0.1);
 
-            // Dùng lerp để chuyển đổi giữa 2 tư thế (tốc độ 0.1 giúp tay di chuyển êm)
             handRRef.current.rotation.z = THREE.MathUtils.lerp(handRRef.current.rotation.z, targetZ, 0.1);
             handRRef.current.rotation.x = THREE.MathUtils.lerp(handRRef.current.rotation.x, targetX, 0.1);
+            handRRef.current.position.y = Math.sin(t * 1.5) * 0.02;
+        }
+
+        if (handLRef.current) {
+            const targetZ = -0.2 + Math.cos(t * 0.8) * 0.05;
+            const targetX = Math.sin(t * 1.2) * 0.1;
+            handLRef.current.rotation.z = THREE.MathUtils.lerp(handLRef.current.rotation.z, targetZ, 0.1);
+            handLRef.current.rotation.x = THREE.MathUtils.lerp(handLRef.current.rotation.x, targetX, 0.1);
+            handLRef.current.position.y = Math.sin(t * 1.5) * 0.02;
         }
         // 👁️ HEAD TRACKING
         group.current.rotation.y = THREE.MathUtils.lerp(group.current.rotation.y, (face.x - 0.5) * -1.0, 0.1)

@@ -98,7 +98,7 @@ class EmotionDetector:
         # Nếu Pose bình thường, mới xét đến kết quả từ DeepFace (Face)
         return mapping.get(face_emotion, "Ổn định")
 
-    def detect(self, frame, landmarks):
+    def detect_posture(self, frame, landmarks):
         # 1. Lấy cảm xúc từ mặt
         face_emo = self.get_face_emotion(frame)
         

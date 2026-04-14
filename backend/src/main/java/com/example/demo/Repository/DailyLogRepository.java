@@ -1,10 +1,12 @@
 package com.example.demo.Repository;
 
-import com.example.demo.Entity.DailyLog;
 import org.springframework.data.mongodb.repository.MongoRepository;
-import org.springframework.stereotype.Repository;
+import com.example.demo.entity.DailyLog;
+import java.time.LocalDate;
+import java.util.Optional;
 
-@Repository
 public interface DailyLogRepository extends MongoRepository<DailyLog, String> {
-    // Luân có thể thêm các hàm tìm kiếm nâng cao ở đây nếu cần
+
+    Optional<DailyLog> findByUserIdAndDate(String userId, LocalDate date);
+
 }
