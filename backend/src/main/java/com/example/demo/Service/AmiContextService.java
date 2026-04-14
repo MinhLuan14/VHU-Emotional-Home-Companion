@@ -37,16 +37,17 @@ public class AmiContextService {
 
         // --- 3. LOGIC RA QUYẾT ĐỊNH (BRAIN) ---
 
-        // A. Cảnh báo té ngã (Ưu tiên cao nhất)
-        if ("NGUY HIEM: NGA".equals(frame.getPosture())) {
-            return triggerSpeech("Trời đất ơi nội ơi! Nội có sao không? Đợi con xíu con gọi nhà mình nhen!",
-                    "FALL_ALERT", recentTalks);
+        // Trong AmiContextService.java
+
+        // A. Cảnh báo té ngã (Dùng contains cho chắc)
+        if (frame.getPosture() != null && frame.getPosture().contains("NGA")) {
+            return triggerSpeech("Trời đất ơi nội ơi!...", "FALL_ALERT", recentTalks);
         }
 
-        // B. Cảnh báo ngồi quá lâu (1800s = 30 phút)
-        if (frame.getSittingSeconds() >= 1800) {
-            return triggerSpeech("Dạ nội ơi, mình ngồi cũng lâu rồi đó, đứng lên đi tới đi lui cho khỏe chân nhen nội.",
-                    "LONG_SITTING", recentTalks);
+        // B. Cảnh báo ngồi lâu (Giảm ngưỡng test xuống 10s thay vì 1800s để xem nó có
+        // lưu ko)
+        if (frame.getSittingSeconds() >= 10) {
+            return triggerSpeech("Dạ nội ơi, mình ngồi cũng lâu rồi đó...", "LONG_SITTING", recentTalks);
         }
 
         // C. Cảnh báo tư thế khom lưng

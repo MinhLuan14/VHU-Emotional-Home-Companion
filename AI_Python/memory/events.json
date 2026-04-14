@@ -1,0 +1,86 @@
+[
+  {
+    "time": "12:58:01",
+    "status": "⚠️ NGỒI KHOM LƯNG",
+    "emotion": "neutral",
+    "sitting_seconds": 19
+  },
+  {
+    "time": "12:58:01",
+    "status": "⚠️ NGỒI KHOM LƯNG",
+    "emotion": "neutral",
+    "sitting_seconds": 19
+  },
+  {
+    "time": "13:02:21",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 9
+  },
+  {
+    "time": "13:02:31",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 19
+  },
+  {
+    "time": "13:02:41",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 29
+  },
+  {
+    "time": "13:02:51",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 39
+  },
+  {
+    "time": "13:03:01",
+    "status": "⚠️ NGỒI KHOM LƯNG",
+    "emotion": "neutral",
+    "sitting_seconds": 49
+  },
+  {
+    "time": "13:03:11",
+    "status": "⚠️ NGỒI KHOM LƯNG",
+    "emotion": "neutral",
+    "sitting_seconds": 59
+  },
+  {
+    "time": "13:03:21",
+    "status": "⚠️ NỘI NGỒI QUÁ LÂU",
+    "emotion": "neutral",
+    "sitting_seconds": 69
+  },
+  {
+    "time": "13:03:41",
+    "status": "⚠️ NỘI NGỒI QUÁ LÂU",
+    "emotion": "neutral",
+    "sitting_seconds": 90
+  },
+  {
+    "time": "13:04:01",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 8
+  },
+  {
+    "time": "13:04:11",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 18
+  },
+  {
+    "time": "13:04:21",
+    "status": "⚠️ NGỒI KHOM LƯNG",
+    "emotion": "neutral",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "13:12:39",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 8
+  }
+]
