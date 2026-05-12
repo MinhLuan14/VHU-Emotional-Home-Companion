@@ -31,49 +31,38 @@ class EmotionDetector:
 
     # ===== 2. POSE EMOTION (Nâng cấp chuẩn xác hơn) =====
     def get_pose_emotion(self, landmarks):
-        if not landmarks:
-            return "neutral"
-
+        if not landmarks: return "neutral"
         try:
-            # Lấy tọa độ các điểm quan trọng
+            # Lấy các điểm quan trọng
             nose = landmarks[0]
-            l_shoulder, r_shoulder = landmarks[11], landmarks[12]
-            l_elbow, r_elbow = landmarks[13], landmarks[14]
+            l_sh, r_sh = landmarks[11], landmarks[12]
             l_wrist, r_wrist = landmarks[15], landmarks[16]
-            l_hip, r_hip = landmarks[23], landmarks[24]
-
-            # Tính toán các chỉ số vật lý
-            avg_shoulder_y = (l_shoulder.y + r_shoulder.y) / 2
-            avg_elbow_y = (l_elbow.y + r_elbow.y) / 2
-            avg_hip_y = (l_hip.y + r_hip.y) / 2
             
-            # --- LOGIC PHÂN TÍCH CHUẨN ---
+            # Tính độ rộng vai để làm đơn vị đo lường (scale) thay vì dùng số cứng
+            shoulder_width = abs(l_sh.x - r_sh.x)
+            avg_sh_y = (l_sh.y + r_sh.y) / 2
 
-            # 1. SAD (Buồn/Mệt mỏi): Đầu gục thấp hẳn dưới vai HOẶC Tay chống cằm/ôm mặt lâu
-            # (Khoảng cách tay tới mặt rất gần)
-            hand_to_face_dist = min(
-                np.sqrt((l_wrist.x - nose.x)**2 + (l_wrist.y - nose.y)**2),
-                np.sqrt((r_wrist.x - nose.x)**2 + (r_wrist.y - nose.y)**2)
-            )
-            if nose.y > avg_shoulder_y + 0.05 or hand_to_face_dist < 0.1:
+            # 1. KIỂM TRA SAD (Cúi đầu sâu)
+            # Chỉ coi là buồn nếu mũi thấp xuống gần bằng đường nối hai vai
+            if (avg_sh_y - nose.y) < shoulder_width * 0.2: 
                 return "sad"
 
-            # 2. ANGRY/STRESSED (Giận dữ/Căng thẳng): Tay chống hông HOẶC Khoanh tay trước ngực
-            # (Khuỷu tay đưa ra xa thân người trong khi tay ở gần hông)
-            if avg_elbow_y > avg_shoulder_y and hand_to_face_dist > 0.3:
-                # Nếu khuỷu tay ngang tầm hông nhưng tay không giơ cao -> Đang bực bội/chống hông
-                if abs(l_wrist.y - l_hip.y) < 0.1 or abs(r_wrist.y - r_hip.y) < 0.1:
-                    return "angry"
-
-            # 3. HAPPY (Vui vẻ): Tay giơ cao hơn vai (Vẫy tay) HOẶC Tay mở rộng (Thoải mái)
-            if l_wrist.y < l_shoulder.y or r_wrist.y < r_shoulder.y:
+            # 2. KIỂM TRA HAPPY (Vẫy tay hoặc tay giơ cao)
+            # Tay cao hơn hẳn vai
+            if l_wrist.y < l_sh.y - 0.1 or r_wrist.y < r_sh.y - 0.1:
                 return "happy"
 
-        except Exception as e:
-            print(f"Pose Emotion Error: {e}")
-            
-        return "neutral"
+            # 3. KIỂM TRA CĂNG THẲNG (Tay ôm đầu/mặt)
+            # Khoảng cách từ cổ tay đến mũi bé hơn 1/2 độ rộng vai
+            dist_l = np.sqrt((l_wrist.x - nose.x)**2 + (l_wrist.y - nose.y)**2)
+            dist_r = np.sqrt((r_wrist.x - nose.x)**2 + (r_wrist.y - nose.y)**2)
+            if dist_l < shoulder_width * 0.5 or dist_r < shoulder_width * 0.5:
+                # Nếu tay ở gần mặt mà không phải giơ cao thì thường là mệt mỏi/lo lắng
+                return "sad" 
 
+        except Exception as e:
+            print(f"Error: {e}")
+        return "neutral"
     # ===== 3. FUSION (Kết hợp thông minh - Ưu tiên Pose nếu Face mờ) =====
     def fuse_emotion(self, face_emotion, pose_emotion):
         # Chuyển đổi sang tiếng Việt cho thân thiện với hệ thống của Luân
@@ -99,19 +88,11 @@ class EmotionDetector:
         return mapping.get(face_emotion, "Ổn định")
 
     def detect_posture(self, frame, landmarks):
-        # 1. Lấy cảm xúc từ mặt
         face_emo = self.get_face_emotion(frame)
-        
-        # 2. Lấy cảm xúc từ dáng bộ (Quan trọng nhất cho người già)
         pose_emo = self.get_pose_emotion(landmarks)
-
-        # 3. Kết hợp kết quả
         final_emo = self.fuse_emotion(face_emo, pose_emo)
-        
-        # 4. Dùng Buffer để tránh tình trạng cảm xúc bị "giật" (đang vui nhảy sang buồn ngay)
         self.emotion_buffer.append(final_emo)
-        
-        # Trả về cảm xúc xuất hiện nhiều nhất trong 20 khung hình gần nhất
-        stable_emotion = max(set(self.emotion_buffer), key=self.emotion_buffer.count)
-
-        return stable_emotion
+        latest = self.emotion_buffer[-1]
+        if self.emotion_buffer.count(latest) > len(self.emotion_buffer) * 0.3:
+            return latest
+        return max(set(self.emotion_buffer), key=self.emotion_buffer.count)

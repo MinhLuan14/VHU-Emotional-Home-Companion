@@ -1,23 +1,5 @@
 [
   {
-    "time": "12:58:01",
-    "status": "⚠️ NGỒI KHOM LƯNG",
-    "emotion": "neutral",
-    "sitting_seconds": 19
-  },
-  {
-    "time": "12:58:01",
-    "status": "⚠️ NGỒI KHOM LƯNG",
-    "emotion": "neutral",
-    "sitting_seconds": 19
-  },
-  {
-    "time": "13:02:21",
-    "status": "🧘 ĐANG NGỒI NGHỈ",
-    "emotion": "neutral",
-    "sitting_seconds": 9
-  },
-  {
     "time": "13:02:31",
     "status": "🧘 ĐANG NGỒI NGHỈ",
     "emotion": "neutral",
@@ -82,5 +64,539 @@
     "status": "🧘 ĐANG NGỒI NGHỈ",
     "emotion": "neutral",
     "sitting_seconds": 8
+  },
+  {
+    "time": "11:08:21",
+    "status": "Ami nói: Nha nội, dậy đứng dậy nhen, quá lâu rồi đó dạ.",
+    "emotion": "Happy",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "11:08:51",
+    "status": "Ami nói: Nha nội, dậy đứng dậy nhen, quá lâu rồi đó dạ.",
+    "emotion": "Happy",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "11:20:57",
+    "status": "Ami nói: Nha nội, dậy đứng dậy nhen, quá lâu rồi đó dạ.",
+    "emotion": "Happy",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "11:23:57",
+    "status": "Ami nói: Dậy đứng dậy nhen, quá lâu rồi đó dạ.",
+    "emotion": "Happy",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "12:08:37",
+    "status": "Ami nói: Nha nội, dậy đứng dậy nhen, quá lâu ngồi rồi đó dạ.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "12:09:07",
+    "status": "Ami nói: Nha nội, dậy đứng dậy nhen, quá lâu ngồi rồi đó dạ.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "12:09:38",
+    "status": "Ami nói: Nha nội, dậy đứng dậy nhen, quá lâu ngồi rồi đó dạ.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "12:21:39",
+    "status": "Ami nói: Nha nội, dậy đứng dậy nhen, quá lâu ngồi rồi đó dạ.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "12:22:17",
+    "status": "Ami nói: Nha nội, dậy đứng dậy nhen, quá lâu ngã rồi đó dạ.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "15:38:26",
+    "status": "Ami nói: Nha nội, dậy đứng dậy nhen, quá lâu ngã rồi đó dạ.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "21:37:08",
+    "status": "Ami nói: Nha nội, dậy đứng dậy nhen!",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "21:37:21",
+    "status": "Ami nói: Dậy thôi nhen, ngã lâu quá!",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "21:38:03",
+    "status": "Ami nói: Dậy thôi nhen, ngã lâu quá!",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "21:39:47",
+    "status": "Ami nói: Dậy thôi nhen, ngã lâu quá!",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "21:40:00",
+    "status": "Ami nói: Dậy thôi nhen, ngã lâu quá!",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "21:40:29",
+    "status": "Ami nói: Dậy thôi nhen!",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:28:56",
+    "status": "🙂 Nội đang sinh hoạt",
+    "emotion": "neutral",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:29:01",
+    "status": "Ami nói: Nội đứng dậy đi lại cho khỏe chân nhen.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:29:01",
+    "status": "Ami nói: Nội đứng dậy đi lại cho khỏe chân nhen.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:29:05",
+    "status": "Ami nói: Nội đứng dậy đi chơi nhen.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:29:05",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 4
+  },
+  {
+    "time": "22:29:13",
+    "status": "Ami nói: Nội ơi, đứng dậy đi lại nhen.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:29:15",
+    "status": "Ami nói: Nội ơi nội có sao không nhen?",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:29:15",
+    "status": "🚨 NGUY HIỂM: NGÃ",
+    "emotion": "neutral",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:29:20",
+    "status": "Ami nói: Nội ơi, đứng dậy đi lại chút nhen.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:29:25",
+    "status": "🚨 NGUY HIỂM: NGÃ",
+    "emotion": "neutral",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:29:30",
+    "status": "Ami nói: Nội ơi, đứng dậy đi lại chút nhen.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:29:35",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 7
+  },
+  {
+    "time": "22:29:42",
+    "status": "Ami nói: Nội ơi, đi lại chút đó nội, nhen!",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:29:42",
+    "status": "Ami nói: Nội ngồi lâu quá, đứng dậy đi lại nha nội.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:29:45",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 17
+  },
+  {
+    "time": "22:29:52",
+    "status": "Ami nói: Nội ơi, đứng dậy đi lại nha nội, cho máu lưu thông đó nhen.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:29:53",
+    "status": "Ami nói: Nội đứng dậy đi lại đó nội, nhen!",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:29:55",
+    "status": "Không thấy người",
+    "emotion": "neutral",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:29:58",
+    "status": "Ami nói: Nội đứng dậy đi lại chút đó nội, nhen!",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:29:58",
+    "status": "Ami nói: Nội ơi, đứng dậy đi lại nhen, cho máu lưu thông đó nha nội.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:30:01",
+    "status": "Ami nói: Nội ơi, đứng dậy đi lại chút đó nội, nhen!",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:30:03",
+    "status": "Ami nói: Nội đứng dậy đi lại chút đó nội, nhen!",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:30:05",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:30:06",
+    "status": "Ami nói: Nội ơi, đứng dậy đi lại đó nội, nhen!",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:30:09",
+    "status": "Ami nói: Nội đứng dậy đi lại chút đó nội, nhen!",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:30:15",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 8
+  },
+  {
+    "time": "22:30:25",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 1
+  },
+  {
+    "time": "22:30:35",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 11
+  },
+  {
+    "time": "22:30:42",
+    "status": "Ami nói: Nội ơi, đứng dậy đi lại đó nội, nhen!",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:30:45",
+    "status": "🚨 NGUY HIỂM: NGÃ",
+    "emotion": "neutral",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:31:20",
+    "status": "🙂 Nội đang sinh hoạt",
+    "emotion": "neutral",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:31:30",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 6
+  },
+  {
+    "time": "22:31:40",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 5
+  },
+  {
+    "time": "22:31:41",
+    "status": "Ami nói: Nội ơi nội có sao không nội?",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:31:44",
+    "status": "Ami nói: Nội ơi nội đứng dậy đi lại nhen.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:31:50",
+    "status": "🚨 NGUY HIỂM: NGÃ",
+    "emotion": "neutral",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:31:57",
+    "status": "Ami nói: Nội ơi, đứng dậy đi lại nha nội, cho khỏe chân nhen.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:32:00",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 5
+  },
+  {
+    "time": "22:32:10",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 15
+  },
+  {
+    "time": "22:32:20",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:32:22",
+    "status": "Ami nói: Nội ơi, đứng dậy đi lại đó nội, cho khỏe chân nhen.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:32:28",
+    "status": "Ami nói: Nội ơi, đứng dậy đi lại đó nội cho khỏe chân nhen.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:32:30",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 4
+  },
+  {
+    "time": "22:32:40",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 14
+  },
+  {
+    "time": "22:32:50",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 24
+  },
+  {
+    "time": "22:33:00",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 2
+  },
+  {
+    "time": "22:33:11",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 12
+  },
+  {
+    "time": "22:33:21",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 22
+  },
+  {
+    "time": "22:33:31",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 32
+  },
+  {
+    "time": "22:33:41",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 43
+  },
+  {
+    "time": "22:33:51",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 53
+  },
+  {
+    "time": "22:33:59",
+    "status": "Ami nói: Nội ơi, đứng dậy đi lại cho khỏe chân nhen.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:34:01",
+    "status": "Ami nói: Nội ơi, đứng dậy đi lại đó nội, cho khỏe chân nhen.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:34:01",
+    "status": "⚠️ NỘI NGỒI QUÁ LÂU",
+    "emotion": "neutral",
+    "sitting_seconds": 63
+  },
+  {
+    "time": "22:34:11",
+    "status": "⚠️ NỘI NGỒI QUÁ LÂU",
+    "emotion": "neutral",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:34:13",
+    "status": "Ami nói: Nội ơi, đứng dậy đi lại đó nội, cho khỏe chân nhen.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:34:17",
+    "status": "Ami nói: Nội ơi, đứng dậy đi lại đó nội, cho khỏe chân nhen.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:34:21",
+    "status": "Không thấy người",
+    "emotion": "neutral",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:34:25",
+    "status": "Ami nói: Nội ơi, đứng dậy đi lại đó nội, cho khỏe chân nhen.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:34:28",
+    "status": "Ami nói: Nội ơi, đứng dậy đi lại đó nội, cho khỏe chân nhen.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:34:31",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 5
+  },
+  {
+    "time": "22:41:40",
+    "status": "🙂 Nội đang sinh hoạt",
+    "emotion": "neutral",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:41:49",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 10
+  },
+  {
+    "time": "22:41:58",
+    "status": "Ami nói: Nội đứng dậy đi lại cho khỏe chân nhen.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:42:00",
+    "status": "✅ TRẠNG THÁI TỐT",
+    "emotion": "neutral",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:42:02",
+    "status": "Ami nói: Nội nên nghỉ ngơi thôi, nha nội.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:42:10",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 10
+  },
+  {
+    "time": "22:42:20",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 20
+  },
+  {
+    "time": "22:42:30",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 4
+  },
+  {
+    "time": "22:42:30",
+    "status": "Ami nói: Nội ơi, nội đứng dậy đi lại nhen.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:42:32",
+    "status": "Ami nói: Nội nghỉ ngơi thôi, nha nội.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:42:37",
+    "status": "Ami nói: Nội đứng dậy đi lại chút nhen.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "22:42:40",
+    "status": "🧘 ĐANG NGỒI NGHỈ",
+    "emotion": "neutral",
+    "sitting_seconds": 5
   }
 ]

@@ -1,45 +1,75 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import {
-    Camera, PieChart, Video, Music, Heart, Users,
-    Trophy, MessageCircle, TrendingUp, Clock, Send, Award, Bot, MicOff, X, Mic
+    Heart,
+    Camera,
+    Send,
+    Mic,
+    MicOff,
+    Phone,
+    Bell,
+    Users,
+    Clock,
+    Activity,
+    X,
+    Sparkles,
+    Shield,
+    Brain,
+    ChevronRight,
 } from 'lucide-react';
+
 import icon from '../assets/3DAI.png';
 import { API_AI_URL } from '../config';
+
 const Home: React.FC = () => {
     const [messages, setMessages] = useState([
-        { role: 'bot', text: "Chào bác! Con đã theo dõi hoạt động của bác hôm nay. Mọi thứ đều rất tuyệt! Cháu Minh có gửi một video mới, bác có muốn xem không ạ?" },
+        {
+            role: 'bot',
+            text: 'Chào bác. Hôm nay bác cảm thấy thế nào ạ? Con luôn ở đây để đồng hành cùng bác.',
+        },
     ]);
-    // --- STATES ---
+
     const [inputValue, setInputValue] = useState('');
     const [isTyping, setIsTyping] = useState(false);
-    const [isVoiceMode, setIsVoiceMode] = useState(false); // Chỉ giữ lại 1 dòng này
+    const [isVoiceMode, setIsVoiceMode] = useState(false);
     const [isListening, setIsListening] = useState(false);
-    const [transcript, setTranscript] = useState("");
+    const [transcript, setTranscript] = useState('');
     const [isAISpeaking, setIsAISpeaking] = useState(false);
 
-    // --- REFS ---
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const recognitionRef = useRef<any>(null);
+
     const callAI = async (text: string) => {
         setIsTyping(true);
-        try {                           //http://localhost:8000/api/ai/chat
+
+        try {
             const response = await fetch(`${API_AI_URL}/api/ai/chat`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_input: text }),
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_input: text,
+                }),
             });
+
             const data = await response.json();
 
-            setMessages(prev => [...prev, { role: 'bot', text: data.text }]);
+            setMessages((prev) => [
+                ...prev,
+                {
+                    role: 'bot',
+                    text: data.text,
+                },
+            ]);
 
             if (data.audio) {
                 if (recognitionRef.current) {
                     recognitionRef.current.stop();
                 }
 
-                // Kiểm tra và làm sạch chuỗi trước khi gán
                 let cleanBase64 = data.audio;
-                // Nếu lỡ Backend gửi kèm tiền tố rồi thì mình bỏ đi để tránh trùng
+
                 if (cleanBase64.includes('base64,')) {
                     cleanBase64 = cleanBase64.split('base64,')[1];
                 }
@@ -54,40 +84,105 @@ const Home: React.FC = () => {
                 setIsAISpeaking(true);
                 (window as any).isAISpeakingGlobal = true;
 
-                audio.play().catch(e => {
-                    console.error("Lỗi phát âm thanh thực tế:", e);
-                    // Nếu vẫn lỗi, thử log 10 ký tự đầu của src để kiểm tra
-                    console.log("Đoạn đầu Audio Src:", audioSrc.substring(0, 50));
-                });
+                audio.play();
+
                 audio.onended = () => {
                     setIsAISpeaking(false);
                     (window as any).isAISpeakingGlobal = false;
-                    setTranscript("");
 
-                    // 3. Chỉ bật lại Mic sau khi Robot nói xong 500ms để tránh echo dư thừa
                     setTimeout(() => {
                         if (isVoiceMode && recognitionRef.current) {
                             try {
                                 recognitionRef.current.start();
-                            } catch (e) { /* Đã chạy rồi thì thôi */ }
+                            } catch (e) { }
                         }
                     }, 500);
                 };
             }
         } catch (error) {
-            console.error("Lỗi:", error);
-            setIsAISpeaking(false);
-            (window as any).isAISpeakingGlobal = false;
+            console.error(error);
         } finally {
             setIsTyping(false);
         }
     };
+
     const handleSendMessage = () => {
         if (!inputValue.trim()) return;
-        setMessages(prev => [...prev, { role: 'user', text: inputValue }]);
-        const currentText = inputValue; // Giữ lại text để gửi
+
+        setMessages((prev) => [
+            ...prev,
+            {
+                role: 'user',
+                text: inputValue,
+            },
+        ]);
+
+        const currentText = inputValue;
+
         setInputValue('');
+
         callAI(currentText);
+    };
+
+    const startListening = () => {
+        const SpeechRecognition =
+            (window as any).SpeechRecognition ||
+            (window as any).webkitSpeechRecognition;
+
+        if (!SpeechRecognition) {
+            alert('Trình duyệt không hỗ trợ giọng nói.');
+            return;
+        }
+
+        const recognition = new SpeechRecognition();
+
+        recognition.lang = 'vi-VN';
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognitionRef.current = recognition;
+
+        recognition.onstart = () => {
+            setIsListening(true);
+        };
+
+        recognition.onresult = (event: any) => {
+            if ((window as any).isAISpeakingGlobal) return;
+
+            let interimTranscript = '';
+
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                const text = event.results[i][0].transcript;
+
+                if (event.results[i].isFinal) {
+                    setTranscript('');
+                    handleVoiceCommand(text);
+                } else {
+                    interimTranscript += text;
+                    setTranscript(interimTranscript);
+                }
+            }
+        };
+
+        recognition.onend = () => {
+            if (isVoiceMode && !(window as any).isAISpeakingGlobal) {
+                try {
+                    recognition.start();
+                } catch (e) { }
+            } else {
+                setIsListening(false);
+            }
+        };
+
+        recognition.start();
+    };
+
+    const stopListening = () => {
+        setIsListening(false);
+
+        if (recognitionRef.current) {
+            recognitionRef.current.stop();
+        }
     };
 
     const toggleVoiceMode = () => {
@@ -100,301 +195,623 @@ const Home: React.FC = () => {
         }
     };
 
-    const startListening = () => {
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            alert("Trình duyệt của bác không hỗ trợ nhận diện giọng nói.");
-            return;
-        }
-
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'vi-VN';
-        recognition.continuous = true;
-        recognition.interimResults = true;
-
-        // LƯU VÀO REF ĐỂ QUẢN LÝ
-        recognitionRef.current = recognition;
-
-        recognition.onstart = () => {
-            setIsListening(true); // Cập nhật để giao diện biết đang nghe
-        };
-
-        recognition.onresult = (event: any) => {
-            if ((window as any).isAISpeakingGlobal) return;
-
-            let interimTranscript = "";
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-                const text = event.results[i][0].transcript;
-                if (event.results[i].isFinal) {
-                    setTranscript(""); // Xóa chữ tạm khi đã có câu chốt
-                    handleVoiceCommand(text);
-                } else {
-                    interimTranscript += text;
-                    setTranscript(interimTranscript);
-                }
-            }
-        };
-
-        recognition.onend = () => {
-            // Nếu vẫn trong chế độ Voice và AI không nói thì tự bật lại
-            if (isVoiceMode && !(window as any).isAISpeakingGlobal) {
-                try { recognition.start(); } catch (e) { }
-            } else {
-                setIsListening(false);
-            }
-        };
-
-        recognition.start();
-    };
-    const stopListening = () => {
-        setIsListening(false);
-        if (recognitionRef.current) {
-            recognitionRef.current.stop();
-        }
-    };
-
     const handleVoiceCommand = (text: string) => {
         if (!text.trim()) return;
-        setMessages(prev => [...prev, { role: 'user', text: text }]);
+
+        setMessages((prev) => [
+            ...prev,
+            {
+                role: 'user',
+                text,
+            },
+        ]);
+
         callAI(text);
     };
+
     return (
-        <div className="space-y-8 animate-in fade-in zoom-in duration-700 pb-10">
-            {/* 1. VOICE OVERLAY MODE */}
+        <div className="min-h-screen bg-[#ECECEC]">
+
+            {/* =========================================================
+                VOICE MODE
+            ========================================================== */}
             {isVoiceMode && (
-                <div className="fixed inset-0 z-[9999] bg-blue-900/90 backdrop-blur-xl flex flex-col items-center justify-center p-6 text-white animate-in zoom-in duration-300">
+                <div className="fixed inset-0 z-[9999] bg-[#EEF4FF] flex flex-col items-center justify-center px-6">
+
                     <button
                         onClick={() => setIsVoiceMode(false)}
-                        className="absolute top-10 right-10 p-4 bg-white/10 rounded-full hover:bg-white/20 transition-all"
+                        className="absolute top-8 right-8 bg-white shadow-sm border border-gray-200 rounded-full p-4"
                     >
-                        <X size={32} />
+                        <X size={28} className="text-slate-600" />
                     </button>
 
-                    <div className="relative mb-8">
-                        <div className={`w-64 h-64 rounded-[4rem] border-4 border-white/30 overflow-hidden shadow-2xl transition-all duration-500 ${isListening ? 'scale-110 shadow-blue-400/50' : 'scale-100'}`}>
-                            <img src={icon} className="w-full h-full object-cover" alt="Ngavi" />
-                        </div>
-                        {isListening && (
-                            <div className="absolute -inset-4 border-4 border-blue-400 rounded-[4.5rem] animate-ping opacity-50"></div>
-                        )}
+                    <div
+                        className={`w-56 h-56 rounded-[3rem] overflow-hidden border-4 transition-all duration-300 ${isListening
+                            ? 'border-blue-400 scale-105 shadow-[0_0_60px_rgba(59,130,246,0.35)]'
+                            : 'border-white'
+                            }`}
+                    >
+                        <img
+                            src={icon}
+                            alt="AI"
+                            className="w-full h-full object-cover"
+                        />
                     </div>
 
-                    <h2 className="text-3xl font-black mb-2 uppercase tracking-tighter">
-                        {isListening ? "Con đang nghe bác..." : "EmoCare AI sẵn sàng!"}
+                    <h2 className="text-4xl font-black text-slate-700 mt-10">
+                        AI đang lắng nghe
                     </h2>
-                    <p className="text-blue-200 text-xl font-medium mb-12 h-8 italic text-center">
-                        "{transcript || "Bác hãy nói gì đó với con đi..."}"
+
+                    <p className="text-xl text-slate-500 mt-4 text-center max-w-xl leading-relaxed">
+                        {transcript || 'Bác hãy nói chuyện với con nhé'}
                     </p>
 
                     <button
                         onClick={isListening ? stopListening : startListening}
-                        className={`p-8 rounded-full transition-all ${isListening ? 'bg-red-500 shadow-red-500/50' : 'bg-blue-500 shadow-blue-500/50'} shadow-2xl hover:scale-110`}
+                        className={`mt-10 w-24 h-24 rounded-full flex items-center justify-center shadow-lg transition-all ${isListening
+                            ? 'bg-red-500'
+                            : 'bg-blue-500'
+                            }`}
                     >
-                        {isListening ? <MicOff size={40} /> : <Mic size={40} />}
+                        {isListening ? (
+                            <MicOff size={38} className="text-white" />
+                        ) : (
+                            <Mic size={38} className="text-white" />
+                        )}
                     </button>
                 </div>
             )}
 
-            {/* 2. HERO GREETING SECTION */}
-            <div className="bg-white/60 backdrop-blur-md rounded-[2rem] p-8 border border-white shadow-sm">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div>
-                        <h2 className="text-3xl md:text-4xl font-black text-slate-700 tracking-tight">
-                            <span className="text-orange-500">Xin chào</span> <span className="text-blue-600">bác</span>
-                        </h2>
-                        <p className="text-slate-500 mt-2 font-medium text-lg">Trợ lý AI đang hoạt động và giám sát an toàn.</p>
+            {/* =========================================================
+                PAGE CONTAINER
+            ========================================================== */}
+            <div className="max-w-[1700px] mx-auto px-4 md:px-6 xl:px-8 py-6 space-y-8">
+
+                {/* =========================================================
+                    HERO SECTION
+                ========================================================== */}
+                <section className="relative overflow-hidden rounded-[3rem] bg-[#4D4D4D]">
+
+                    <div className="absolute inset-0 opacity-10">
+                        <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-blue-400 blur-3xl"></div>
+                        <div className="absolute bottom-0 left-0 w-96 h-96 rounded-full bg-violet-500 blur-3xl"></div>
                     </div>
-                    <div className="flex gap-3">
-                        <div className="bg-emerald-100 text-emerald-700 px-4 py-2 rounded-2xl font-bold text-sm flex items-center gap-2">
-                            <Heart size={18} fill="currentColor" /> Cảm xúc: Vui vẻ
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            {/* 3. MAIN DASHBOARD GRID */}
-            <div className="grid grid-cols-12 gap-6">
+                    <div className="relative grid xl:grid-cols-2 gap-0">
 
-                {/* LEFT PANEL: MONITORING */}
-                <div className="col-span-12 lg:col-span-3 space-y-6">
-                    <div className="bg-white rounded-[2rem] overflow-hidden shadow-xl border border-gray-100">
-                        <div className="p-5 flex justify-between items-center border-b border-gray-50">
-                            <div className="flex items-center gap-2 text-slate-500 font-black uppercase text-xs tracking-widest">
-                                <Camera size={16} className="text-orange-500" /> Giám sát hoạt động
-                            </div>
-                            <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-ping"></span>
-                        </div>
-                        <div className="relative group">
-                            <img src="https://images.unsplash.com/photo-1581579438747-1dc8d17bbce4?auto=format&fit=crop&q=80&w=400" className="w-full h-56 object-cover" alt="Hoạt động" />
-                            <div className="absolute inset-x-4 bottom-4 bg-white/90 backdrop-blur-md p-4 rounded-2xl shadow-lg border border-white">
-                                <p className="text-xs font-bold text-slate-400 uppercase">Trạng thái hiện tại</p>
-                                <p className="text-slate-700 font-black text-sm">Đang ngồi (Tĩnh: 45ph)</p>
-                            </div>
-                        </div>
-                        <div className="p-6">
-                            <h4 className="font-black text-slate-700 mb-4 flex items-center justify-between text-sm uppercase text-center w-full">
-                                Chỉ số cảm xúc <PieChart size={16} className="text-blue-500" />
-                            </h4>
-                            <div className="flex items-center justify-center py-4 relative">
-                                <svg className="w-32 h-32 transform -rotate-90">
-                                    <circle cx="64" cy="64" r="50" stroke="currentColor" strokeWidth="12" fill="transparent" className="text-slate-100" />
-                                    <circle cx="64" cy="64" r="50" stroke="currentColor" strokeWidth="12" fill="transparent" strokeDasharray="314" strokeDashoffset="100" className="text-orange-400" />
-                                </svg>
-                                <div className="absolute text-center">
-                                    <span className="block text-2xl font-black text-slate-700">75%</span>
-                                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Tích cực</span>
+                        {/* LEFT */}
+                        <div className="p-8 md:p-12 xl:p-16 flex flex-col justify-center">
+
+                            <div className="flex flex-wrap gap-3 mb-8">
+
+                                <div className="bg-white/10 backdrop-blur-sm border border-white/10 px-5 py-3 rounded-full text-white font-bold text-sm flex items-center gap-2">
+                                    <Brain size={18} />
+                                    AI thấu cảm
+                                </div>
+
+                                <div className="bg-white/10 backdrop-blur-sm border border-white/10 px-5 py-3 rounded-full text-white font-bold text-sm flex items-center gap-2">
+                                    <Shield size={18} />
+                                    Bảo mật dữ liệu
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </div>
 
-                {/* CENTRAL PANEL: CHATBOT */}
-                <div className="col-span-12 lg:col-span-6 space-y-6">
-                    <div className="bg-white rounded-[3rem] shadow-2xl border-2 border-slate-100 flex flex-col h-[620px] relative z-20">
-                        <div className="p-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex justify-between items-center relative h-20 rounded-t-[2.8rem] z-10">
-                            <div className="flex items-center gap-4 relative">
-                                <div className="absolute -top-12 -left-10 w-36 h-36 z-[9999] drop-shadow-[0_25px_35px_rgba(0,0,0,0.4)] animate-bounce-slow">
-                                    <div className="w-full h-full bg-white/10 backdrop-blur-lg rounded-[2.8rem] p-1.5 overflow-hidden border-2 border-white/40 shadow-[inset_0_0_15px_rgba(255,255,255,0.2)]">
-                                        <img src={icon} alt="AI Guardian" className="w-full h-full object-cover rounded-[2.3rem]" />
-                                    </div>
-                                    <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-20 h-3 bg-blue-400/30 blur-xl rounded-full animate-pulse"></div>
-                                </div>
-                                <div className="w-24"></div>
-                                <div className="z-10">
-                                    <h3 className="font-black text-sm uppercase tracking-widest">Người bảo vệ hạnh phúc</h3>
-                                    <div className="flex items-center gap-2">
-                                        <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                                        <p className="text-[10px] text-blue-100 font-bold uppercase">AI đang phân tích</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                            <h1 className="text-white text-5xl md:text-6xl xl:text-7xl leading-[1.1] font-black max-w-4xl">
+                                Đồng hành cảm xúc
+                                <span className="block text-[#F6C445]">
+                                    cho người cao tuổi
+                                </span>
+                            </h1>
 
-                        <div className="flex-grow p-6 overflow-y-auto space-y-4 bg-slate-50/50 scrollbar-hide">
-                            {messages.map((msg, i) => (
-                                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}>
-                                    <div className={`max-w-[80%] p-4 rounded-[2rem] font-medium text-sm shadow-sm ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white text-slate-700 rounded-tl-none border border-gray-100'
-                                        }`}>
-                                        {msg.text}
-                                    </div>
-                                </div>
-                            ))}
+                            <p className="mt-8 text-lg md:text-xl leading-relaxed text-white/75 max-w-2xl">
+                                Hệ thống AI hỗ trợ tinh thần, theo dõi trạng thái cảm xúc,
+                                kết nối gia đình và chăm sóc sức khỏe tinh thần toàn diện.
+                            </p>
 
-                            {isTyping && (
-                                <div className="flex justify-start animate-pulse">
-                                    <div className="bg-white text-slate-400 p-4 rounded-[2rem] rounded-tl-none border border-gray-100 shadow-sm flex items-center gap-1">
-                                        <span className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce"></span>
-                                        <span className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                                        <span className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                            <div className="flex flex-wrap gap-4 mt-10">
 
-                        <div className="p-4 bg-white border-t border-gray-100 relative z-20 rounded-b-[3rem]">
-                            <div className="relative flex items-center gap-2">
-                                <div className="relative flex-grow">
-                                    <input
-                                        type="text"
-                                        value={inputValue}
-                                        onChange={(e) => setInputValue(e.target.value)}
-                                        onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                                        placeholder="Hỏi về hoạt động của bác..."
-                                        className="w-full bg-slate-100 border-none rounded-2xl py-4 pl-6 pr-14 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none"
-                                    />
-                                    <button
-                                        onClick={handleSendMessage}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-lg active:scale-95"
-                                    >
-                                        <Send size={18} />
-                                    </button>
-                                </div>
-
-                                <button
-                                    onClick={toggleVoiceMode}
-                                    className="p-4 bg-orange-500 text-white rounded-2xl hover:bg-orange-600 transition-all shadow-lg active:scale-95 group"
-                                    title="Nói chuyện với Ngavi"
+                                <Link
+                                    to="/Vision"
+                                    className="h-16 px-8 rounded-2xl bg-[#F6C445] hover:bg-[#eab932] transition-all text-slate-900 font-black text-lg flex items-center gap-3 shadow-lg"
                                 >
-                                    <Mic size={22} className="group-hover:animate-pulse" />
+                                    <Mic size={22} />
+                                    Trò chuyện với AI
+                                </Link>
+
+                                <button className="h-16 px-8 rounded-2xl bg-white/10 hover:bg-white/15 backdrop-blur-sm border border-white/10 transition-all text-white font-black text-lg flex items-center gap-3">
+                                    Xem hoạt động
+                                    <ChevronRight size={20} />
                                 </button>
                             </div>
+
+                            {/* STATS */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-14">
+
+                                {[
+                                    {
+                                        title: 'AI hoạt động',
+                                        value: '24/7',
+                                    },
+                                    {
+                                        title: 'Độ an toàn',
+                                        value: '99%',
+                                    },
+                                    {
+                                        title: 'Phản hồi',
+                                        value: '1.2s',
+                                    },
+                                    {
+                                        title: 'Kết nối',
+                                        value: 'Gia đình',
+                                    },
+                                ].map((item, index) => (
+                                    <div
+                                        key={index}
+                                        className="bg-white/10 border border-white/10 rounded-2xl p-5 backdrop-blur-sm"
+                                    >
+                                        <p className="text-white/60 text-sm uppercase tracking-wider font-bold">
+                                            {item.title}
+                                        </p>
+
+                                        <h3 className="text-white text-2xl font-black mt-2">
+                                            {item.value}
+                                        </h3>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* RIGHT */}
+                        <div className="relative min-h-[450px] xl:min-h-[800px]">
+
+                            <img
+                                src="https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=1600&auto=format&fit=crop"
+                                alt=""
+                                className="absolute inset-0 w-full h-full object-cover"
+                            />
+
+                            <div className="absolute inset-0 bg-gradient-to-r from-[#4D4D4D] via-[#4D4D4D]/30 to-transparent xl:bg-gradient-to-l"></div>
+
+                            {/* FLOATING CARD */}
+                            <div className="absolute bottom-10 left-10 right-10 bg-white/90 backdrop-blur-xl rounded-[2rem] p-6 border border-white/30 shadow-2xl">
+
+                                <div className="flex items-center justify-between">
+
+                                    <div>
+                                        <p className="text-slate-400 uppercase tracking-widest text-xs font-black">
+                                            Trạng thái hiện tại
+                                        </p>
+
+                                        <h3 className="text-3xl font-black text-slate-700 mt-2">
+                                            Tinh thần tích cực
+                                        </h3>
+                                    </div>
+
+                                    <div className="w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center">
+                                        <Heart
+                                            className="text-emerald-500"
+                                            fill="currentColor"
+                                            size={30}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="mt-6 h-3 rounded-full bg-slate-200 overflow-hidden">
+                                    <div className="w-[75%] h-full bg-gradient-to-r from-blue-500 to-violet-500 rounded-full"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                {/* =========================================================
+                    MAIN GRID
+                ========================================================== */}
+                <div className="grid grid-cols-12 gap-8">
+
+                    {/* =========================================================
+                        LEFT SIDEBAR
+                    ========================================================== */}
+                    <div className="col-span-12 xl:col-span-3 space-y-8">
+
+                        {/* CAMERA */}
+                        <div className="bg-white rounded-[2.5rem] border border-gray-200 overflow-hidden shadow-sm">
+
+                            <div className="p-7 flex items-center justify-between">
+
+                                <div className="flex items-center gap-3">
+                                    <Camera className="text-blue-500" />
+
+                                    <h3 className="text-2xl font-black text-slate-700">
+                                        Camera AI
+                                    </h3>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-full bg-emerald-500"></span>
+
+                                    <span className="text-sm font-bold text-emerald-600">
+                                        Online
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="relative">
+                                <img
+                                    src="https://images.unsplash.com/photo-1581579438747-1dc8d17bbce4?auto=format&fit=crop&q=80&w=1000"
+                                    alt=""
+                                    className="w-full h-80 object-cover"
+                                />
+
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+
+                                <div className="absolute bottom-6 left-6 right-6">
+                                    <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-5">
+                                        <p className="text-slate-400 uppercase tracking-widest text-xs font-black">
+                                            Hoạt động
+                                        </p>
+
+                                        <h4 className="text-2xl font-black text-slate-700 mt-2">
+                                            Đang thư giãn
+                                        </h4>
+
+                                        <p className="text-slate-500 mt-2">
+                                            Không phát hiện bất thường trong 2 giờ gần nhất.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* EMOTION */}
+                        <div className="bg-white rounded-[2.5rem] border border-gray-200 p-8 shadow-sm">
+
+                            <div className="flex items-center gap-3 mb-10">
+                                <Sparkles className="text-violet-500" />
+
+                                <h3 className="text-2xl font-black text-slate-700">
+                                    Cảm xúc hôm nay
+                                </h3>
+                            </div>
+
+                            <div className="flex justify-center">
+
+                                <div className="relative w-52 h-52">
+
+                                    <svg className="w-52 h-52 -rotate-90">
+
+                                        <circle
+                                            cx="104"
+                                            cy="104"
+                                            r="82"
+                                            stroke="#E5E7EB"
+                                            strokeWidth="16"
+                                            fill="transparent"
+                                        />
+
+                                        <circle
+                                            cx="104"
+                                            cy="104"
+                                            r="82"
+                                            stroke="url(#gradient)"
+                                            strokeWidth="16"
+                                            fill="transparent"
+                                            strokeDasharray="515"
+                                            strokeDashoffset="120"
+                                            strokeLinecap="round"
+                                        />
+
+                                        <defs>
+                                            <linearGradient id="gradient">
+                                                <stop offset="0%" stopColor="#3B82F6" />
+                                                <stop offset="100%" stopColor="#8B5CF6" />
+                                            </linearGradient>
+                                        </defs>
+                                    </svg>
+
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+
+                                        <h4 className="text-5xl font-black text-slate-700">
+                                            75%
+                                        </h4>
+
+                                        <p className="text-slate-400 font-bold mt-2">
+                                            Tích cực
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* =========================================================
+                        CHAT CENTER
+                    ========================================================== */}
+                    <div className="col-span-12 xl:col-span-6">
+
+                        <div className="bg-white rounded-[3rem] border border-gray-200 shadow-sm overflow-hidden h-[950px] flex flex-col">
+
+                            {/* HEADER */}
+                            <div className="px-8 py-7 border-b border-gray-100 bg-[#FAFAFA]">
+
+                                <div className="flex items-center justify-between">
+
+                                    <div className="flex items-center gap-5">
+
+                                        <div className="w-20 h-20 rounded-[2rem] overflow-hidden border border-gray-200 shadow-sm">
+                                            <img
+                                                src={icon}
+                                                alt=""
+                                                className="w-full h-full object-cover"
+                                            />
+                                        </div>
+
+                                        <div>
+
+                                            <h3 className="text-3xl font-black text-slate-700">
+                                                Trợ lý cảm xúc AI
+                                            </h3>
+
+                                            <div className="flex items-center gap-2 mt-2">
+                                                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+
+                                                <p className="text-slate-400 font-semibold">
+                                                    AI luôn sẵn sàng hỗ trợ
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={toggleVoiceMode}
+                                        className="w-16 h-16 rounded-2xl bg-blue-600 hover:bg-blue-700 transition-all flex items-center justify-center shadow-lg"
+                                    >
+                                        <Mic className="text-white" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* CHAT */}
+                            <div className="flex-1 overflow-y-auto px-6 md:px-8 py-8 bg-[#F7F7F7] space-y-6">
+
+                                {messages.map((msg, i) => (
+                                    <div
+                                        key={i}
+                                        className={`flex ${msg.role === 'user'
+                                            ? 'justify-end'
+                                            : 'justify-start'
+                                            }`}
+                                    >
+
+                                        <div
+                                            className={`max-w-[90%] md:max-w-[80%] px-6 py-5 rounded-[2rem] text-lg leading-relaxed shadow-sm ${msg.role === 'user'
+                                                ? 'bg-gradient-to-r from-blue-600 to-violet-600 text-white rounded-br-md'
+                                                : 'bg-white text-slate-700 rounded-bl-md border border-gray-100'
+                                                }`}
+                                        >
+                                            {msg.text}
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {isTyping && (
+                                    <div className="bg-white w-fit px-6 py-5 rounded-2xl border border-gray-100 shadow-sm">
+
+                                        <div className="flex gap-2">
+
+                                            <span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce"></span>
+                                            <span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce delay-100"></span>
+                                            <span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce delay-200"></span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* INPUT */}
+                            <div className="p-6 border-t border-gray-100 bg-white">
+
+                                <div className="flex items-center gap-4">
+
+                                    <input
+                                        value={inputValue}
+                                        onChange={(e) =>
+                                            setInputValue(e.target.value)
+                                        }
+                                        onKeyDown={(e) =>
+                                            e.key === 'Enter' &&
+                                            handleSendMessage()
+                                        }
+                                        placeholder="Bác muốn trò chuyện điều gì hôm nay?"
+                                        className="flex-1 h-16 rounded-2xl bg-[#F5F5F5] border border-gray-200 px-6 text-lg outline-none focus:border-blue-400"
+                                    />
+
+                                    <button
+                                        onClick={handleSendMessage}
+                                        className="w-16 h-16 rounded-2xl bg-blue-600 hover:bg-blue-700 transition-all flex items-center justify-center shadow-lg"
+                                    >
+                                        <Send className="text-white" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* =========================================================
+                        RIGHT SIDEBAR
+                    ========================================================== */}
+                    <div className="col-span-12 xl:col-span-3 space-y-8">
+
+                        {/* FAMILY */}
+                        <div className="bg-white rounded-[2.5rem] border border-gray-200 p-8 shadow-sm">
+
+                            <div className="flex items-center gap-3 mb-8">
+
+                                <Users className="text-blue-500" />
+
+                                <h3 className="text-2xl font-black text-slate-700">
+                                    Gia đình
+                                </h3>
+                            </div>
+
+                            <div className="space-y-5">
+
+                                {[
+                                    'Minh đã gửi video mới',
+                                    'Tú gửi lời chúc buổi sáng',
+                                    'Gia đình đang chờ cuộc gọi',
+                                ].map((item, i) => (
+                                    <div
+                                        key={i}
+                                        className="bg-[#F7F7F7] rounded-2xl p-5 border border-gray-100"
+                                    >
+                                        <p className="text-slate-600 text-lg leading-relaxed">
+                                            {item}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <button className="w-full h-16 mt-8 rounded-2xl bg-blue-600 hover:bg-blue-700 transition-all text-white text-lg font-black shadow-lg">
+                                Xem kết nối
+                            </button>
+                        </div>
+
+                        {/* ACTIVITIES */}
+                        <div className="bg-white rounded-[2.5rem] border border-gray-200 p-8 shadow-sm">
+
+                            <div className="flex items-center gap-3 mb-8">
+
+                                <Activity className="text-emerald-500" />
+
+                                <h3 className="text-2xl font-black text-slate-700">
+                                    Hoạt động tích cực
+                                </h3>
+                            </div>
+
+                            <div className="space-y-4">
+
+                                {[
+                                    'Đi bộ nhẹ 10 phút',
+                                    'Nghe nhạc thư giãn',
+                                    'Gọi điện cho gia đình',
+                                ].map((item, i) => (
+                                    <div
+                                        key={i}
+                                        className="flex gap-4 rounded-2xl bg-[#F7F7F7] border border-gray-100 p-5"
+                                    >
+                                        <div className="w-3 h-3 rounded-full bg-emerald-500 mt-2"></div>
+
+                                        <p className="text-slate-600 text-lg">
+                                            {item}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* SOS */}
+                        <div className="rounded-[2.5rem] bg-gradient-to-br from-red-500 to-rose-500 p-8 text-white shadow-xl">
+
+                            <div className="flex items-center gap-3 mb-6">
+
+                                <Bell />
+
+                                <h3 className="text-2xl font-black">
+                                    Hỗ trợ khẩn cấp
+                                </h3>
+                            </div>
+
+                            <p className="text-white/85 text-lg leading-relaxed">
+                                AI sẽ liên hệ gia đình hoặc nhân viên hỗ trợ khi phát hiện tình huống bất thường.
+                            </p>
+
+                            <button className="w-full h-16 rounded-2xl bg-white text-red-500 font-black text-lg mt-8 flex items-center justify-center gap-3 hover:bg-red-50 transition-all">
+                                <Phone size={22} />
+                                Gọi hỗ trợ
+                            </button>
                         </div>
                     </div>
                 </div>
 
-                {/* RIGHT PANEL: LEADERBOARD */}
-                <div className="col-span-12 lg:col-span-3 space-y-6">
-                    <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-gray-50">
-                        <div className="flex justify-between items-center mb-8">
-                            <h3 className="font-black text-slate-400 uppercase tracking-[0.2em] text-[10px]">Bảng xếp hạng</h3>
-                            <Award size={20} className="text-orange-400" />
+                {/* =========================================================
+                    BOTTOM SECTION
+                ========================================================== */}
+                <div className="grid xl:grid-cols-2 gap-8">
+
+                    {/* CHART */}
+                    <div className="bg-white rounded-[2.5rem] border border-gray-200 p-8 shadow-sm">
+
+                        <div className="flex items-center gap-3 mb-10">
+
+                            <Activity className="text-orange-500" />
+
+                            <h3 className="text-2xl font-black text-slate-700">
+                                Xu hướng cảm xúc
+                            </h3>
                         </div>
-                        <div className="space-y-6">
-                            {[
-                                { name: 'Bác A', score: 1250, icon: '👴', color: 'bg-orange-100' },
-                                { name: 'Minh', score: 980, icon: '👦', color: 'bg-blue-100' },
-                                { name: 'Tú', score: 850, icon: '👧', color: 'bg-rose-100' }
-                            ].map((user, i) => (
-                                <div key={i} className="flex items-center justify-between group cursor-pointer">
-                                    <div className="flex items-center gap-3">
-                                        <div className={`w-10 h-10 ${user.color} rounded-xl flex items-center justify-center text-lg group-hover:scale-110 transition-transform`}>{user.icon}</div>
-                                        <span className="font-black text-slate-600 text-sm">{user.name}</span>
-                                    </div>
-                                    <span className="text-orange-500 font-black text-xs">{user.score} điểm</span>
-                                </div>
+
+                        <div className="h-72 flex items-end gap-4">
+
+                            {[45, 60, 55, 80, 72, 88, 95].map((h, i) => (
+                                <div
+                                    key={i}
+                                    className="flex-1 rounded-t-[2rem] bg-gradient-to-t from-blue-500 to-violet-500"
+                                    style={{
+                                        height: `${h}%`,
+                                    }}
+                                ></div>
                             ))}
                         </div>
                     </div>
 
-                    <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2.5rem] p-6 text-white shadow-xl relative overflow-hidden">
-                        <div className="relative z-10 space-y-4">
-                            <span className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">Mục tiêu tuần</span>
-                            <h4 className="text-xl font-black leading-tight italic">"Chia sẻ 3 khoảnh khắc vui"</h4>
-                            <button className="w-full bg-white text-indigo-600 py-3 rounded-2xl font-black text-sm shadow-lg active:scale-95 transition-all uppercase">Tham gia ngay</button>
+                    {/* TIMELINE */}
+                    <div className="bg-white rounded-[2.5rem] border border-gray-200 p-8 shadow-sm">
+
+                        <div className="flex items-center gap-3 mb-10">
+
+                            <Clock className="text-blue-500" />
+
+                            <h3 className="text-2xl font-black text-slate-700">
+                                Hoạt động hôm nay
+                            </h3>
                         </div>
-                        <Trophy className="absolute -bottom-4 -right-4 w-32 h-32 text-white/10 rotate-12" />
-                    </div>
-                </div>
-            </div>
 
-            {/* 4. BOTTOM SECTION: TRENDS & TIMELINE */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-lg">
-                    <div className="flex items-center gap-3 mb-6">
-                        <TrendingUp className="text-emerald-500" />
-                        <h3 className="font-black text-slate-700 uppercase tracking-tighter italic">Xu hướng cảm xúc</h3>
-                    </div>
-                    <div className="h-40 w-full bg-slate-50 rounded-3xl flex items-end justify-between p-4 gap-2">
-                        {[40, 70, 45, 90, 65, 80, 95].map((h, i) => (
-                            <div key={i} className="flex-1 bg-orange-400 rounded-t-lg transition-all hover:bg-orange-500" style={{ height: `${h}%` }}></div>
-                        ))}
-                    </div>
-                    <div className="flex justify-between mt-4 text-[10px] font-black text-slate-400 uppercase px-2">
-                        <span>Th2</span><span>Th3</span><span>Th4</span><span>Th5</span><span>Th6</span><span>Th7</span><span>CN</span>
-                    </div>
-                </div>
+                        <div className="space-y-5">
 
-                <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-lg">
-                    <div className="flex items-center gap-3 mb-6">
-                        <Clock className="text-blue-500" />
-                        <h3 className="font-black text-slate-700 uppercase tracking-tighter italic">Dòng thời gian hoạt động</h3>
-                    </div>
-                    <div className="space-y-4">
-                        {[
-                            { time: '08:00 AM', act: 'Tập thể dục buổi sáng', status: 'Hoàn thành' },
-                            { time: '10:30 AM', act: 'Xem tin tức gia đình', status: 'Gợi ý' },
-                            { time: '12:00 PM', act: 'Ăn trưa & Uống thuốc', status: 'Sắp tới' }
-                        ].map((item, i) => (
-                            <div key={i} className="flex items-center gap-4 p-3 rounded-2xl hover:bg-slate-50 transition-colors cursor-pointer">
-                                <span className="text-[10px] font-black text-slate-400 w-16 tracking-tighter">{item.time}</span>
-                                <div className="h-2 w-2 rounded-full bg-blue-400"></div>
-                                <span className="text-sm font-bold text-slate-600 flex-grow">{item.act}</span>
-                                <span className={`text-[10px] font-black px-2 py-1 rounded-md ${item.status === 'Hoàn thành' ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600'}`}>
-                                    {item.status}
-                                </span>
-                            </div>
-                        ))}
+                            {[
+                                {
+                                    time: '08:00',
+                                    text: 'Đi bộ buổi sáng',
+                                },
+                                {
+                                    time: '10:30',
+                                    text: 'Xem video từ gia đình',
+                                },
+                                {
+                                    time: '12:00',
+                                    text: 'Uống thuốc đúng giờ',
+                                },
+                                {
+                                    time: '15:00',
+                                    text: 'Trò chuyện với AI',
+                                },
+                            ].map((item, i) => (
+                                <div
+                                    key={i}
+                                    className="flex gap-5 rounded-2xl bg-[#F7F7F7] border border-gray-100 p-6"
+                                >
+
+                                    <div className="min-w-[80px] text-blue-600 text-lg font-black">
+                                        {item.time}
+                                    </div>
+
+                                    <div className="w-3 h-3 rounded-full bg-blue-500 mt-2"></div>
+
+                                    <div className="text-slate-600 text-lg">
+                                        {item.text}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </div>

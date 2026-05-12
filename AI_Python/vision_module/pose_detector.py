@@ -80,29 +80,31 @@ class PoseDetector:
 
     def is_falling_advanced(self, pts, sh_dist):
         if 0 in pts and 23 in pts and 24 in pts:
-            # 1. Theo dõi vận tốc rơi của mũi (Nose)
+            # 1. Lấy tọa độ Y của mũi và hông trung bình
             nose_y = pts[0][1]
-            if self.last_y is None: self.last_y = nose_y
-            vel = nose_y - self.last_y
-            self.velocity_history.append(vel)
-            self.last_y = nose_y
-            avg_vel = sum(self.velocity_history) / len(self.velocity_history)
-
-            # 2. Kiểm tra tỉ lệ cơ thể (Height vs Width)
-            # Khi đứng: Cao > Rộng. Khi ngã: Rộng thường > Cao (hoặc bằng)
-            y_coords = [p[1] for p in pts.values()]
-            x_coords = [p[0] for p in pts.values()]
+            hip_y = (pts[23][1] + pts[24][1]) / 2
+            
+            # 2. Tính chiều cao và chiều rộng thực tế của cơ thể trong khung hình
+            y_coords = [p[1] for p in pts.values() if p[2] > 0.5]
+            x_coords = [p[0] for p in pts.values() if p[2] > 0.5]
+            if not y_coords: return False
+            
             body_height = max(y_coords) - min(y_coords)
             body_width = max(x_coords) - min(x_coords)
+
+            # 3. ĐIỀU KIỆN NGÃ MỚI:
+            # - CƠ THỂ NẰM NGANG: Rộng > Cao (hoặc chiều cao thu hẹp đột ngột)
+            # - ĐẦU XUỐNG THẤP: Mũi nằm gần mức hông (không cần phải thấp hơn hẳn)
             
-            # Ngưỡng ngã: Vận tốc rơi nhanh + Cơ thể nằm ngang hoặc mũi xuống quá thấp so với hông
-            hip_y = (pts[23][1] + pts[24][1]) / 2
-            if (avg_vel > sh_dist * 0.5) or (nose_y > hip_y):
+            is_horizontal = body_width > body_height * 0.8  # Cơ thể bẹt ra theo chiều ngang
+            head_dropped = abs(nose_y - hip_y) < (sh_dist * 1.2) # Đầu và hông quá gần nhau theo trục Y
+
+            if is_horizontal and head_dropped:
                 self.fall_counter += 1
             else:
                 self.fall_counter = max(0, self.fall_counter - 1)
                 
-            return self.fall_counter > 2
+            return self.fall_counter > 5 # Tăng lên một chút để tránh nhiễu khi nội cúi người
         return False
 
     # --- KHOM LƯNG (Ngưỡng 162°) ---

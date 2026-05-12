@@ -546,21 +546,45 @@ const Vision: React.FC = () => {
 
                         {/* BIO-METRIC DASHBOARD OVERLAY */}
                         <div className="absolute bottom-8 left-8 right-8 z-10 grid grid-cols-2 gap-3">
-                            {/* Card Cảm xúc */}
-                            <div className="bg-white/80 backdrop-blur-md p-4 rounded-[2rem] border border-white shadow-lg">
-                                <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Cảm xúc của Nội</p>
+                            {/* Card Cảm xúc - Bản nâng cấp chuyên nghiệp */}
+                            <div className={`transition-all duration-500 p-4 rounded-[2rem] border shadow-lg ${aiData.emotion === "Căng thẳng" ? "bg-red-50 border-red-200 animate-pulse" :
+                                aiData.emotion === "Buồn/Mệt mỏi" ? "bg-orange-50 border-orange-200" :
+                                    "bg-white/80 backdrop-blur-md border-white"
+                                }`}>
+                                <div className="flex justify-between items-start">
+                                    <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Cảm xúc của Nội</p>
+
+                                    {/* Dot cảnh báo nhỏ góc trên */}
+                                    {(aiData.emotion === "Căng thẳng" || aiData.emotion === "Buồn/Mệt mỏi") && (
+                                        <span className="relative flex h-2 w-2">
+                                            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${aiData.emotion === "Căng thẳng" ? 'bg-red-400' : 'bg-orange-400'}`}></span>
+                                            <span className={`relative inline-flex rounded-full h-2 w-2 ${aiData.emotion === "Căng thẳng" ? 'bg-red-500' : 'bg-orange-500'}`}></span>
+                                        </span>
+                                    )}
+                                </div>
+
                                 <div className="flex items-center gap-3">
-                                    <span className="text-3xl filter drop-shadow-md">
-                                        {/* So sánh chính xác với các chuỗi tiếng Việt mà Backend gửi về */}
+                                    <div className={`text-3xl filter drop-shadow-md transition-transform duration-300 ${aiData.emotion === "Căng thẳng" ? "scale-125" : "scale-100"}`}>
                                         {aiData.emotion === "Vui vẻ" ? "😊" :
                                             aiData.emotion === "Buồn/Mệt mỏi" ? "😟" :
-                                                aiData.emotion === "Căng thẳng" ? "😠" : "😐"}
-                                    </span>
-                                    <span className={`text-[11px] font-black uppercase tracking-tight ${aiData.emotion === "Buồn/Mệt mỏi" ? 'text-orange-500' :
-                                        aiData.emotion === "Căng thẳng" ? 'text-red-500' : 'text-blue-600'
-                                        }`}>
-                                        {aiData.emotion || "Đang phân tích..."}
-                                    </span>
+                                                aiData.emotion === "Căng thẳng" ? "😡" :
+                                                    aiData.emotion === "Lo lắng" ? "😰" : "😐"}
+                                    </div>
+
+                                    <div className="flex flex-col">
+                                        <span className={`text-[11px] font-black uppercase tracking-tight ${aiData.emotion === "Buồn/Mệt mỏi" ? 'text-orange-600' :
+                                            aiData.emotion === "Căng thẳng" ? 'text-red-600' :
+                                                aiData.emotion === "Vui vẻ" ? 'text-green-600' : 'text-blue-600'
+                                            }`}>
+                                            {aiData.emotion || "Đang phân tích..."}
+                                        </span>
+
+                                        {/* Thêm dòng trạng thái phụ để tăng tính AI */}
+                                        <span className="text-[8px] text-slate-500 font-medium">
+                                            {aiData.emotion === "Căng thẳng" ? "Cần chú ý ngay" :
+                                                aiData.emotion === "Buồn/Mệt mỏi" ? "Ami đang an ủi..." : "Sức khỏe ổn định"}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
 

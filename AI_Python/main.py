@@ -24,6 +24,7 @@ from vision_module.emotion_detector import EmotionDetector
 from vision_module.object_detector import ObjectDetector
 from lip_sync_generator import generate_lip_sync 
 from brain_module.context_engine import ContextEngine
+from brain_module.vector_memory import VectorMemory
 # IMPORT TỪ FILE RIÊNG CỦA LUÂN
 from play_voice_worker import play_voice_worker
 import inspect
@@ -86,7 +87,10 @@ if se_files:
 else:
     print("⚠️ CẢNH BÁO: Không tìm thấy file se.pth. Nội hãy chạy extract_voice.py trước nhen!")
 # ======================================================================
-
+running = True # Khai báo để các hàm khác nhìn thấy
+cap_lock = threading.Lock() # Khóa để Camera và AI không giành giật nhau
+last_threshold_update = 0 # Tách riêng thời gian update threshold
+last_java_sync_time = 0 # Tách riêng thời gian gửi Java
 # Sửa dòng này (khoảng dòng 60)
 cap = cv2.VideoCapture(0, cv2.CAP_DSHOW) 
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
@@ -94,9 +98,57 @@ cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
 if not cap.isOpened():
     print("❌ LỖI: Backend không thể kết nối với Camera vật lý!")
+    
 pose_detector = PoseDetector()
 emotion_detector = EmotionDetector()
+class EventEngine:
+    def __init__(self):
+        self.prev_state = {
+            "status": None,
+            "is_falling": False,
+            "is_sitting": False
+        }
+        self.last_event_time = {}
+
+    def detect_event(self, context):
+        events = []
+
+        status = context.get("status", "")
+        if "Ami nói" in status:
+            return []
+        pose = context.get("pose", {})
+
+        is_falling = pose.get("is_falling", False)
+        is_sitting = pose.get("is_sitting", False)
+
+        now = time.time()
+
+        # ===== EVENT 1: FALL =====
+        if is_falling and not self.prev_state["is_falling"]:
+            events.append("FALL_DETECTED")
+
+        # ===== EVENT 2: SIT TOO LONG =====
+        sitting_seconds = context.get("sitting_seconds", 0)
+        if is_sitting and sitting_seconds > 60:
+            last = self.last_event_time.get("SIT_TOO_LONG", 0)
+            if now - last > 300:
+                events.append("SIT_TOO_LONG")
+                self.last_event_time["SIT_TOO_LONG"] = now
+
+        # ===== EVENT 3: STATE CHANGE =====
+        if status != self.prev_state["status"]:
+            events.append("STATE_CHANGED")
+
+        # ===== UPDATE STATE =====
+        self.prev_state = {
+            "status": status,
+            "is_falling": is_falling,
+            "is_sitting": is_sitting
+        }
+
+        return events
 obj_detector = ObjectDetector()
+event_engine = EventEngine()
 # ================== GLOBAL STATE (ĐỒNG BỘ VỚI WORKER) ==================
 # Tìm đến đoạn GLOBAL STATE
 current_ai_status = {
@@ -222,49 +274,80 @@ def start_voice_thread(text: str):
 
 # ================== LOGIC NHẮC NHỞ ==================
 def get_recent_memory(limit=5):
-    """Đọc dữ liệu từ events.json để Ami biết nãy giờ nội làm gì"""
     events = load_json(EVENTS_PATH, [])
-    if not events:
-        return "Nội vừa mới bắt đầu sinh hoạt."
+    if not events: return "Nội đang bắt đầu ngày mới."
     
-    # Lấy n sự kiện gần nhất
     recent = events[-limit:]
-    memory_str = "Nhật ký gần đây:\n"
+    memory_str = ""
     for e in recent:
-        memory_str += f"- Lúc {e['time']}: Nội {e['status']} với cảm xúc {e['emotion']}.\n"
+        # CHỈ lấy những sự kiện KHÔNG phải do Ami nói để tránh lặp lại logic sai
+        if "Ami nói" not in e['status']:
+            memory_str += f"- {e['time']}: Nội {e['status']} ({e['emotion']}). "
     return memory_str
 
-def trigger_remind_logic(status_text, emotion, objects=None, history_context=""):
+last_sent_status = ""
+last_remind_time = 0
+start_app_time = time.time()
+
+REMIND_INTERVAL = 30   # giây giữa các lần nói
+STATUS_COOLDOWN = 5    # giây nếu cùng trạng thái
+START_DELAY = 5        # delay khi mới mở app
+long_term_memory = VectorMemory(max_memory=1000)
+
+def trigger_remind_logic(status_text, emotion, objects=None, history_context="",event_type=None):
+    global last_sent_status, last_remind_time
+    # ===== 1. BLOCK khi AI đang nói =====
     if ai_state.get("is_ai_speaking"):
         return
-
+    current_time = time.time()
+    # ===== 2. Tránh nói ngay khi mở app =====
+    if current_time - start_app_time < START_DELAY:
+        return
+    # ===== 3. Cooldown thời gian =====
+    if current_time - last_remind_time < REMIND_INTERVAL:
+        return
+    # ===== 4. Tránh lặp trạng thái =====
+    if status_text == last_sent_status:
+        if current_time - last_remind_time < STATUS_COOLDOWN:
+            return
     try:
-        # Lấy trí nhớ thực tế từ file
+        # ===== MEMORY =====
         actual_memory = get_recent_memory(5)
-        
-        object_names = [obj.get("name") for obj in objects if isinstance(obj, dict)] if objects else []
+
+        # ===== OBJECT =====
+        object_names = []
+        if objects:
+            for obj in objects:
+                if isinstance(obj, dict):
+                    name = obj.get("name")
+                    if name:
+                        object_names.append(str(name))
+
         object_text = ", ".join(object_names) if object_names else "Không có đồ vật đặc biệt"
-
-        # SYSTEM PROMPT "SIÊU CẤP" (Tối ưu từ bản trước của Luân)
+        status_text = str(status_text) if status_text else "đang hoạt động"
+        emotion = str(emotion) if emotion else "bình thường"
+        actual_memory = str(actual_memory) if actual_memory else "..."
+        query = f"Nội đang {status_text} và {event_type}"
+        similar_past_events = long_term_memory.search(query, k=2, threshold=0.6)
+        
+        past_texts = [res['text'] for res in similar_past_events]
+        past_context = " | ".join(past_texts) if past_texts else "Chưa có dữ liệu tương tự."
+        # Trong hàm trigger_remind_logic
         SYSTEM_PROMPT = (
-            "VAI DIỄN: Ami, cháu nội miền Nam hiếu thảo. "
-            "TRÍ NHỚ: Bạn biết rõ lịch sử sinh hoạt của nội để tâm sự, không chỉ nhìn hiện tại.\n\n"
-            
-            "DỮ LIỆU HIỆN TẠI:\n"
-            f"- Tư thế: {status_text}\n"
-            f"- Cảm xúc: {emotion}\n"
-            f"- Đồ vật: {object_text}\n\n"
-            
-            "TRÍ NHỚ GẦN ĐÂY:\n"
-            f"{actual_memory}\n\n"
-
-            "CHIẾN THUẬT TÂM LÝ:\n"
-            "- Nếu nội vừa mới đổi tư thế (ví dụ từ ngồi sang đứng): Hãy khích lệ nội.\n"
-            "- Nếu nội duy trì một trạng thái quá lâu: Hãy nhắc nội đổi tư thế nhẹ nhàng.\n"
-            "- Tuyệt đối dùng giọng miền Nam (Dạ, nhen, nghen, nha nội, hà, quá xá).\n"
-            "- Trả về DUY NHẤT 1 câu hủ hỉ dưới 25 từ."
+            f"VAI DIỄN: Ami, cháu nội miền Nam hiếu thảo.\n"
+            f"NGỮ CẢNH HIỆN TẠI: Nội đang {status_text}, cảm xúc {emotion}. Sự kiện: {event_type}.\n"
+            f"NHẬT KÝ BRAIN: {history_context}\n"
+            f"CON ĐÃ NÓI GÌ TRƯỚC ĐÓ: {past_context}\n\n"
+            f"VẬT THỂ THẤY ĐƯỢC: {object_text}.\n"
+            f"NHIỆM VỤ:\n"
+            f"1. Nếu {event_type} là 'SIT_TOO_LONG', hãy khuyên nội đứng dậy đi lại cho khỏe chân nhen.\n"
+            f"2. Nếu {event_type} là 'FALL_DETECTED', phải hỏi thăm thật lòng: 'Nội ơi nội có sao không nội?'.\n"
+            f"3. TUYỆT ĐỐI KHÔNG lặp lại ý hệt những câu trong mục 'CON ĐÃ NÓI GÌ TRƯỚC ĐÓ'.\n"
+            f"4. Văn phong: Ngọt ngào, dùng từ: nhen, nha nội, đó nội, nghen.\n"
+            f"5. CHỈ 1 CÂU DUY NHẤT (< 20 từ)."
         )
 
+        # ===== CALL GROQ =====
         completion = client_groq.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "system", "content": SYSTEM_PROMPT}],
@@ -273,34 +356,52 @@ def trigger_remind_logic(status_text, emotion, objects=None, history_context="")
         )
 
         text = completion.choices[0].message.content.strip().replace('"', '')
+
         if text:
             start_voice_thread(text)
-            # Lưu lại câu Ami vừa nói vào lịch sử để không bị lặp
-            log_event({"status": f"Ami nói: {text}", "emotion": "Happy", "sitting_seconds": 0})
+            
+            # 🔥 LƯU VÀO VECTOR MEMORY ĐỂ LẦN SAU KHÔNG LẶP LẠI
+            memory_entry = f"Ami nhắc nội {event_type}: {text}"
+            long_term_memory.add(memory_entry)
+            
+            # Lưu vào events.json như cũ để xem log
+            log_event({"status": f"Ami nói: {text}", "emotion": "Ami_Speaking"})
 
     except Exception as e:
         print(f"❌ Lỗi Brain-Remind: {e}")
 last_sent_status = "" # Biến toàn cục để theo dõi
+last_remind_time = 0
+start_app_time = time.time() # Thêm biến này ở đầu file main.py
 
 def should_remind(context, ai_state):
-    global last_sent_status
+    global last_sent_status, last_remind_time
+    
+    # 1. Lấy dữ liệu thô từ máy quét (Pose), KHÔNG lấy câu nói của Ami
+    # Giả sử Luân lưu status máy quét vào một biến riêng, hoặc lọc chữ "Ami nói"
     status = context.get("status", "")
-    sitting_seconds = context.get("sitting_seconds", 0)
-    
-    # Nếu là Ngã (Fall) - Ưu tiên cao nhất, bỏ qua cooldown
-    if "NGÃ" in status.upper() or "FALL" in status.upper():
-        return True
+    if "Ami nói" in status: 
+        return False # Tuyệt đối không nhắc dựa trên câu nói của Robot
 
-    # Tránh nhắc lại cùng một trạng thái trong thời gian ngắn
-    if status == last_sent_status and sitting_seconds < 120: 
-        return False
-    
-    # Logic thời gian ngồi (dựa trên config động của Luân)
+    sitting_seconds = context.get("sitting_seconds", 0)
+    now = time.time()
     cfg = load_config()
-    if sitting_seconds > cfg.get("sitting_threshold", 60):
-        last_sent_status = status
-        return True
-        
+    threshold = cfg.get("sitting_threshold", 60)
+
+    # 2. KIỂM TRA NGÃ (Phải là status từ PoseDetector)
+    # Chỉ báo ngã nếu Pose thật sự trả về chữ NGÃ
+    if "NGÃ" in status.upper() and sitting_seconds >= 0:
+        if now - last_remind_time > 15:
+            last_remind_time = now
+            return True
+        return False
+
+    # 3. KIỂM TRA NGỒI LÂU (Bắt buộc sitting_seconds phải lớn hơn ngưỡng)
+    # Luân thêm điều kiện sitting_seconds > threshold để chặn đứng vụ 0s
+    if "NGỒI" in status.upper() and sitting_seconds > threshold and threshold > 0:
+        if now - last_remind_time > 300: # 5 phút nhắc 1 lần thôi nhen
+            last_remind_time = now
+            return True
+
     return False
 def sync_to_java(payload):
     try:
@@ -316,12 +417,12 @@ def camera_worker():
 
     while running:
         try:
-            if cap is None or not cap.isOpened():
-                print("⚠️ Camera mất kết nối, retry...")
-                cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-                time.sleep(1)
-                continue
-
+            with cap_lock:
+                if cap is None or not cap.isOpened():
+                    print("⚠️ Camera mất kết nối, retry...")
+                    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+                    time.sleep(2)
+                    continue
             ret, frame = cap.read()
             if not ret:
                 continue
@@ -338,20 +439,17 @@ def camera_worker():
 last_log_time = 0
 
 def ai_worker():
-    global last_log_time, last_warning_time
+    # Sử dụng các biến global mới đã tách biệt
+    global last_threshold_update, last_java_sync_time, last_warning_time 
 
     print("🧠 AI Worker running...")
-
-    face_cascade = cv2.CascadeClassifier(
-        cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-    )
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
     while True:
         try:
             now = time.time()
-            if now - last_log_time > 10:
-                update_adaptive_threshold()
-                last_log_time = now
+            
+            # 1. LẤY FRAME TỪ BUFFER (Dùng copy() để tránh xung đột luồng)
             with buffer_lock:
                 if not raw_buffer:
                     time.sleep(0.01)
@@ -360,53 +458,45 @@ def ai_worker():
 
             h, w, _ = frame.shape
 
-            # ===== POSE =====
+            # 2. XỬ LÝ POSE & SITTING TIME
             frame = pose_detector.findPose(frame, draw=True)
             lmList = pose_detector.getPosition(frame)
-
-            status_text = "Đang quét..."
             pose_ctx = {}
             sitting_seconds = 0
-
             if lmList:
                 status_text, color, sitting_seconds, pose_ctx = pose_detector.detect_posture(frame)
             else:
                 status_text = "Không thấy người"
 
-            # ===== EMOTION =====
+            # 3. XỬ LÝ EMOTION (Sửa lại tên hàm cho đúng thực tế module)
             emotion = "neutral"
             try:
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 faces = face_cascade.detectMultiScale(gray, 1.3, 5)
-
                 if len(faces) > 0:
                     x, y, fw, fh = faces[0]
                     face_img = frame[y:y+fh, x:x+fw]
+                    # Lưu ý: Kiểm tra lại file emotion_detector.py xem là detect_posture hay detect_emotion nhen
                     emotion = emotion_detector.detect_posture(face_img, None)
-
             except Exception as e:
                 print("Emotion error:", e)
 
-            if not isinstance(emotion, str):
-                emotion = "neutral"
-
-            # ===== OBJECT =====
+            # 4. XỬ LÝ OBJECTS
             try:
                 objects, obj_context = obj_detector.detect_objects(frame)
                 frame = obj_detector.draw_objects(frame, objects, obj_context)
             except:
                 objects = []
 
-            # ===== BRAIN =====
+            # 5. BRAIN ENGINE (Xử lý ngữ cảnh tổng hợp)
             final_status, brain_context = brain.process_frame(
                 pose_ctx=pose_ctx if isinstance(pose_ctx, dict) else {},
                 objects=objects,
                 emotion=emotion
             )
-
             display_status = final_status if isinstance(final_status, str) else status_text
 
-            # ===== UPDATE UI =====
+            # 6. CẬP NHẬT TRẠNG THÁI UI
             current_ai_status.update({
                 "status": display_status,
                 "emotion": emotion,
@@ -415,60 +505,50 @@ def ai_worker():
                 "full_objects_data": objects
             })
 
-            # ===== FACE TRACK =====
-            if lmList:
-                face_tracking["x"] = float(lmList[0][1] / w) - 0.5
-                face_tracking["y"] = float(lmList[0][2] / h) - 0.5
-
-           # ===== LOGIC GHI LOG ĐỊNH KỲ (GOM VÀO TRONG IF) =====
-            # 1. KHỞI TẠO CONTEXT LUÔN LUÔN (Đưa ra ngoài mọi câu lệnh IF)
+            # 7. LOGIC ĐỒNG BỘ DATA (TÁCH BIỆT THỜI GIAN)
             context = {
-                "status": display_status,
-                "emotion": emotion,
-                "objects": objects,
-                "sitting_seconds": sitting_seconds,
-                "pose": pose_ctx
+                "status": display_status, "emotion": emotion,
+                "objects": objects, "sitting_seconds": sitting_seconds, "pose": pose_ctx
             }
 
-            # 2. LOGIC GHI LOG ĐỊNH KỲ (Chỉ dùng context để ghi file mỗi 10s)
-            # Trong hàm ai_worker của Python
-            now = time.time()
-            if now - last_log_time > 10: 
-                try:
-                    java_url = "http://localhost:8080/api/ami/process"
-                    
-                    # Payload phải có đầy đủ userId và đúng tên trường Java cần
-                    payload = {
-                        "userId": "user_01", # Luân nhớ thêm cái này
-                        "status": display_status, # Sẽ map vào posture nhờ @JsonProperty
-                        "sitting_seconds": int(sitting_seconds), # Sẽ map vào sittingSeconds
-                        "emotion": emotion,
-                        "warning": current_ai_status["is_warning"]
-                    }
-                    
-                    threading.Thread(target=sync_to_java, args=(payload,), daemon=True).start()
-                    print(f"📡 Java Status: {response.status_code}")
-                    
-                except Exception as e:
-                    print(f"❌ Lỗi đẩy dữ liệu: {e}")
+            # --- Nhánh 1: Cập nhật ngưỡng AI học (Mỗi 10s) ---
+            if now - last_threshold_update > 10:
+                last_threshold_update = now
+                update_adaptive_threshold()
+
+            # --- Nhánh 2: Gửi data lên Java & Ghi log file (Mỗi 10s) ---
+            if now - last_java_sync_time > 10:
+                last_java_sync_time = now # Update ngay để tránh thread trùng lặp
+                
+                payload = {
+                    "userId": "user_01",
+                    "status": str(display_status), 
+                    "sitting_seconds": int(sitting_seconds), 
+                    "emotion": str(emotion),
+                    "warning": bool(current_ai_status["is_warning"])
+                }
+
+                def safe_sync(p):
+                    try:
+                        requests.post("http://localhost:8080/api/ami/process", json=p, timeout=2)
+                    except: pass
+
+                threading.Thread(target=safe_sync, args=(payload,), daemon=True).start()
                 log_event(context)
                 update_stats(context)
-                last_log_time = now 
-                print(f"📝 Đã lưu log định kỳ (Sitting: {sitting_seconds}s)")
+                print(f"📝 Sync & Log success (Sitting: {sitting_seconds}s)")
 
-            # 3. LOGIC NHẮC NHỞ (Bây giờ context đã luôn tồn tại nên không sợ lỗi nữa)
-            if should_remind(context, ai_state):
-                now_remind = time.time()
-                if now_remind - last_warning_time > WARNING_COOLDOWN:
-                    last_warning_time = now_remind
-                    history = brain_context.get("description", "") if isinstance(brain_context, dict) else ""
+            # 8. LOGIC NHẮC NHỞ (Chỉ chạy khi có sự kiện thực sự)
+            events = event_engine.detect_event(context)
+            history = brain_context.get("description", "") if isinstance(brain_context, dict) else ""
+            for event in events:
+                threading.Thread(
+                    target=trigger_remind_logic,
+                    args=(display_status, emotion, objects, history, event), 
+                    daemon=True
+                ).start()
 
-                    threading.Thread(
-                        target=trigger_remind_logic,
-                        args=(display_status, emotion, objects, history),
-                        daemon=True
-                    ).start()
-            # ===== ENCODE =====
+            # 9. ĐẨY FRAME ĐÃ XỬ LÝ RA KÊNH HIỂN THỊ
             success, buffer = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
             if success:
                 with buffer_lock:
@@ -478,10 +558,7 @@ def ai_worker():
 
         except Exception as e:
             print("❌ AI WORKER ERROR:", e)
-            traceback.print_exc()
             time.sleep(0.2)
-
-
 
 @app.websocket("/ws/video")
 async def websocket_video(websocket: WebSocket):
