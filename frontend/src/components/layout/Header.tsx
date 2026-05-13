@@ -134,78 +134,72 @@ const Header: React.FC<HeaderProps> = () => {
                                         title: 'AI thấu cảm',
                                         gradient: 'from-violet-500 via-fuchsia-500 to-pink-500',
                                         glow: 'shadow-fuchsia-500/30',
-
+                                        link: '/',
                                     },
                                     {
                                         title: 'Thị giác AI',
                                         gradient: 'from-sky-500 via-cyan-500 to-blue-500',
                                         glow: 'shadow-cyan-500/30',
-
+                                        link: '/Vision',
                                     },
                                     {
                                         title: 'Bảo mật',
                                         gradient: 'from-emerald-500 via-teal-500 to-green-500',
                                         glow: 'shadow-emerald-500/30',
-
+                                        link: '/security',
                                     },
                                     {
                                         title: 'Chi phí thấp',
                                         gradient: 'from-orange-400 via-amber-400 to-yellow-400',
                                         glow: 'shadow-orange-400/30',
-
+                                        link: '/pricing',
                                     },
                                 ].map((item, index) => (
-                                    <div
+                                    <Link
                                         key={index}
+                                        to={item.link}
                                         className={`
-                group
-                relative
-                overflow-hidden
-                h-11
-                px-5
-                rounded-2xl
-                bg-gradient-to-r
-                ${item.gradient}
-                text-white
-                flex
-                items-center
-                gap-3
-                shadow-lg
-                ${item.glow}
-                hover:scale-105
-                hover:-translate-y-1
-                transition-all
-                duration-300
-                cursor-default
-            `}
+                                group
+                                relative
+                                overflow-hidden
+                                h-11
+                                px-5
+                                rounded-2xl
+                                bg-gradient-to-r
+                                ${item.gradient}
+                                text-white
+                                flex
+                                items-center
+                                gap-3
+                                shadow-lg
+                                ${item.glow}
+                                hover:scale-105
+                                hover:-translate-y-1
+                                transition-all
+                                duration-300
+                            `}
                                     >
 
-                                        {/* GLOW EFFECT */}
                                         <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
 
-                                        {/* ICON */}
-                                        <span className="relative text-sm">
-                                            {item.icon}
-                                        </span>
-
-                                        {/* TEXT */}
                                         <span
                                             className="
-                    relative
-                    text-[11px]
-                    uppercase
-                    tracking-[0.18em]
-                    font-black
-                    whitespace-nowrap
-                "
+                                    relative
+                                    text-[11px]
+                                    uppercase
+                                    tracking-[0.18em]
+                                    font-black
+                                    whitespace-nowrap
+                                "
                                         >
                                             {item.title}
                                         </span>
-                                    </div>
+                                    </Link>
                                 ))}
                             </div>
                         </div>
                     </Link>
+
 
                     {/* RIGHT SIDE */}
                     <div className="flex flex-col items-end gap-5 flex-shrink-0">
@@ -414,7 +408,7 @@ const Header: React.FC<HeaderProps> = () => {
                         </button>
                     </div>
                 </div>
-            </div >
+            </div>
 
             {/* =========================================================
                 MOBILE HEADER

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import Webcam from 'react-webcam';
 import {
     Camera, ShieldAlert, Activity, Home as HomeIcon, User,
@@ -9,19 +10,63 @@ import { Canvas } from '@react-three/fiber';
 import { Suspense } from 'react';
 import { OrbitControls, Environment, Float, ContactShadows } from '@react-three/drei';
 import { EveRobot } from '../components/EveRobot';
-interface DetectedObject {
-    label: string;
-    bbox: [number, number, number, number];
+interface FaceData {
+    x: number;
+    y: number;
 }
-interface AIData {
-    status: string;
-    is_warning: boolean;
-    emotion: string;
-    back_angle?: number;
-    velocity?: number;
-    detected_objects: DetectedObject[];
+
+interface DetectedObject {
+    label_en: string;
+    label: string;
+    bbox: number[];
+    center: number[];
+    conf: number;
+    timestamp: number;
+}
+
+interface PostureData {
+    state: "SITTING" | "STANDING" | "FALLING" | "UNKNOWN";
+    back_angle: number;     // độ nghiêng lưng (degree)
+    velocity: number;       // tốc độ thay đổi tư thế
+    confidence: number;     // độ tin cậy AI (0 → 1)
+}
+
+interface PoseKeypoint {
+    x: number;
+    y: number;
+    score?: number;
+    name?: string;
+}
+
+interface PoseData {
+    keypoints: PoseKeypoint[];
+}
+
+interface AIStatus {
+    text: string;
+    emotion?: string;
     sitting_seconds?: number;
-    face?: { x: number; y: number };
+}
+
+export interface AIData {
+    status: string | AIStatus;
+
+    is_warning: boolean;
+
+    emotion: string;
+
+    detected_objects: DetectedObject[];
+
+    sitting_seconds?: number;
+
+    face?: FaceData;
+    posture?: PostureData;
+    pose?: PoseData;
+
+    // optional future modules
+    audio?: string;
+    frame?: string;
+    lip_sync?: number[];
 }
 
 interface Relative {
@@ -51,6 +96,7 @@ const Vision: React.FC = () => {
     ]);
     const [selectedRelative, setSelectedRelative] = useState<Relative>(relatives[0]);
     const [showAddVoice, setShowAddVoice] = useState(false);
+    const recognitionRef = useRef<any>(null);
     const [newName, setNewName] = useState("");
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -59,9 +105,10 @@ const Vision: React.FC = () => {
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [lastFrame, setLastFrame] = useState("");
     const socketRef = useRef<WebSocket | null>(null);
-
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const containerRef = useRef<HTMLDivElement | null>(null);
     useEffect(() => {
-        if (socketRef.current) return; // 🛑 CHỐNG DOUBLE CONNECT
+        if (socketRef.current) return; // chống double connect
 
         const baseUrl = new URL(API_AI_URL);
         const protocol = baseUrl.protocol === "https:" ? "wss:" : "ws:";
@@ -78,56 +125,71 @@ const Vision: React.FC = () => {
             try {
                 const data = JSON.parse(event.data);
 
-                // 🛑 CHECK NULL TRƯỚC
                 if (data.frame) {
                     setLastFrame(data.frame);
                 }
 
-                socket.onmessage = (event) => {
-                    try {
-                        const data = JSON.parse(event.data);
-                        if (data.frame) setLastFrame(data.frame);
+                // 1. NORMALIZE STATUS & EMOTION
+                // Ưu tiên lấy từ data.posture nếu data.status chỉ là chuỗi thông báo chung
+                const statusText = data.posture?.status || (typeof data.status === "string" ? data.status : data.status?.text) || "UNKNOWN";
+                const emotionText = data.emotion || data.status?.emotion || "Ổn định";
+                const sittingSeconds = data.posture?.sitting_seconds || data.status?.sitting_seconds || 0;
 
-                        // Kiểm tra xem status có phải là Object chứa description không
-                        const statusText = typeof data.status?.status === 'object'
-                            ? data.status.status.description  // Lấy chuỗi mô tả nếu nó là object
-                            : (data.status?.status || "");
+                // 2. WARNING ENGINE (Nâng cấp độ nhạy)
+                const isWarning =
+                    Boolean(data.is_warning || data.warning) ||
+                    data.posture?.is_falling === true ||
+                    data.posture?.risk_level === "DANGER" ||
+                    statusText.includes("NGÃ") ||
+                    statusText.includes("FALLING");
 
-                        // Kiểm tra emotion tương tự
-                        const emotionText = typeof data.status?.emotion === 'object'
-                            ? data.status.emotion.emotion_text
-                            : (data.status?.emotion || "Ổn định");
-
-                        setAiData({
-                            status: String(statusText),
-                            is_warning: !!data.status?.is_warning,
-                            emotion: String(emotionText),
-                            detected_objects: data.status?.full_objects_data || [],
-                            sitting_seconds: data.status?.sitting_seconds || 0,
-                            face: data.face || { x: 0.5, y: 0.5 }
-                        });
-                    } catch (error) {
-                        console.error("❌ WS parse error:", error);
-                    }
+                // 3. FACE & POSE SAFE
+                const face = {
+                    x: data.face?.x ?? 0.5,
+                    y: data.face?.y ?? 0.5,
                 };
+                const pose = data.pose || null;
+                const detectedObjects = Array.isArray(data.detected_objects) ? data.detected_objects : [];
+
+                // 4. STATE UPDATE
+                setAiData((prev) => ({
+                    ...prev,
+                    status: statusText,
+                    emotion: emotionText,
+                    sitting_seconds: sittingSeconds,
+                    face,
+                    detected_objects: detectedObjects,
+                    is_warning: isWarning,
+                    posture: data.posture ? {
+                        state: data.posture.state ?? "UNKNOWN",
+                        back_angle: data.posture.back_angle ?? 0,
+                        velocity: data.posture.velocity ?? 0,
+                        confidence: data.posture.confidence ?? 0,
+                        // Lưu thêm các flag quan trọng nếu cần dùng ở UI khác
+                        is_falling: data.posture.is_falling,
+                        risk_level: data.posture.risk_level
+                    } : undefined,
+                    pose,
+                }));
+
             } catch (error) {
                 console.error("❌ WS parse error:", error);
             }
         };
+
         socket.onerror = (err) => {
             console.error("❌ WS error:", err);
         };
+
         socket.onclose = () => {
             console.log("🔌 WS closed");
             socketRef.current = null;
         };
-        return () => {
-            if (socketRef.current) {
-                socketRef.current.close();
-                socketRef.current = null;
-            }
-        };
 
+        return () => {
+            socket.close();
+            socketRef.current = null;
+        };
     }, []);
 
     const handleVoiceChat = async (transcript: string) => {
@@ -200,51 +262,99 @@ const Vision: React.FC = () => {
     const { webkitSpeechRecognition, SpeechRecognition } = window as unknown as IWindow;
 
     const startListening = () => {
-        // CHẶN: Không bật mic nếu AI đang nói hoặc đang xử lý dữ liệu
+
         if (isProcessing || isListening) return;
 
         const Recognition = SpeechRecognition || webkitSpeechRecognition;
 
         if (!Recognition) {
-            console.error("Trình duyệt không hỗ trợ nhận diện giọng nói.");
+            console.error("Browser không hỗ trợ speech recognition");
             return;
         }
 
-        const recognition = new Recognition();
-        recognition.lang = 'vi-VN';
-        recognition.continuous = false;
-        recognition.interimResults = false;
+        // Tạo 1 lần duy nhất
+        if (!recognitionRef.current) {
 
-        recognition.onstart = () => {
-            setIsListening(true);
-            console.log("🎤 Hệ thống đang lắng nghe nội...");
-        };
+            const recognition = new Recognition();
 
-        // Fix lỗi 'event' implicitly has an 'any' type
-        recognition.onresult = (event: any) => {
-            const transcript = event.results[0][0].transcript;
-            if (transcript && transcript.trim().length > 1) {
-                console.log("Nội nói:", transcript);
-                handleVoiceChat(transcript); // Gửi sang API chat
-            }
-        };
+            recognition.lang = 'vi-VN';
+            recognition.continuous = false;
+            recognition.interimResults = false;
 
-        recognition.onerror = (event: any) => {
-            console.error("Lỗi Mic:", event.error);
-            setIsListening(false);
-        };
+            recognition.onstart = () => {
+                console.log("🎤 Listening...");
+                setIsListening(true);
+            };
 
-        recognition.onend = () => {
-            setIsListening(false);
-            // Vòng lặp sẽ tự kích hoạt lại nhờ useEffect khi isListening = false
-        };
+            recognition.onresult = (event: any) => {
+
+                const transcript =
+                    event.results?.[0]?.[0]?.transcript || "";
+
+                console.log("🗣️", transcript);
+
+                if (transcript.trim().length > 1) {
+                    handleVoiceChat(transcript);
+                }
+            };
+
+            recognition.onerror = (event: any) => {
+
+                console.error("Speech Error:", event.error);
+
+                setIsListening(false);
+
+                // Ignore lỗi nhỏ
+                if (
+                    event.error === "no-speech" ||
+                    event.error === "aborted"
+                ) {
+                    return;
+                }
+            };
+
+            recognition.onend = () => {
+                console.log("🛑 Recognition ended");
+                setIsListening(false);
+            };
+
+            recognitionRef.current = recognition;
+        }
 
         try {
-            recognition.start();
-        } catch (e) {
-            console.log("Mic đang chạy, không cần start lại.");
+            recognitionRef.current.start();
+        } catch (err) {
+            console.log("Recognition already started");
         }
     };
+    const toggleFullscreen = async () => {
+        try {
+            if (!document.fullscreenElement) {
+                await containerRef.current?.requestFullscreen();
+            } else {
+                await document.exitFullscreen();
+            }
+        } catch (err) {
+            console.error("Fullscreen error:", err);
+        }
+    };
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setIsFullscreen(!!document.fullscreenElement);
+        };
+
+        document.addEventListener(
+            'fullscreenchange',
+            handleFullscreenChange
+        );
+
+        return () => {
+            document.removeEventListener(
+                'fullscreenchange',
+                handleFullscreenChange
+            );
+        };
+    }, []);
     return (
         <div className="relative space-y-8 animate-in fade-in duration-700 pb-10 max-w-[1600px] mx-auto">
 
@@ -266,10 +376,7 @@ const Vision: React.FC = () => {
                                     <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full uppercase">Sức khỏe</span>
                                 </div>
                                 <h4 className="text-base font-black text-slate-800 leading-tight uppercase tracking-tighter">
-                                    {/* Đảm bảo nó là string trước khi dùng replace */}
-                                    {typeof aiData.status === 'string'
-                                        ? aiData.status.replace(/[🚨⚠️🆘]/g, '').trim()
-                                        : "Đang phân tích..."}
+                                    {aiData.status ? String(aiData.status).replace(/[🚨⚠️🆘]/g, '').trim() : "ĐANG KIỂM TRA"}
                                 </h4>
                             </div>
                             <button onClick={() => setAiData(prev => ({ ...prev, is_warning: false }))} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-300">
@@ -302,27 +409,123 @@ const Vision: React.FC = () => {
             <div className="grid grid-cols-12 gap-8">
                 {/* CỘT TRÁI: CAMERA & VOICE CONTROL */}
                 <div className="col-span-12 lg:col-span-8 space-y-6">
-                    <div className="relative bg-slate-900 rounded-[3.5rem] overflow-hidden shadow-2xl border-[6px] border-white aspect-video group">
-                        {aiData && aiData.sitting_seconds !== undefined && aiData.sitting_seconds > 0 && (
-                            <div className="absolute top-8 right-8 z-30">
-                                <div className="bg-orange-500/20 backdrop-blur-md border-2 border-orange-500 p-3 rounded-2xl flex flex-col items-end">
-                                    <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-1">
-                                        Thời gian ngồi
-                                    </span>
-                                    <div className="flex items-baseline gap-1">
-                                        <span className="text-3xl font-black text-white tabular-nums">
-                                            {/* Dùng Number() hoặc || 0 để đảm bảo luôn có số */}
-                                            {aiData.sitting_seconds || 0}
-                                        </span>
-                                        <span className="text-sm font-bold text-orange-500">giây</span>
-                                    </div>
-                                </div>
+                    <div
+                        ref={containerRef}
+                        className={`
+                            relative
+                            bg-slate-900
+                            overflow-hidden
+                            shadow-2xl
+                            border-[6px]
+                            border-white
+                            transition-all
+                            duration-500
+                            ${isFullscreen
+                                ? 'fixed inset-0 z-[9999] rounded-none w-screen h-screen'
+                                : 'rounded-[3.5rem] aspect-video'}
+                        `}
+                    >
+
+                        {/* ================= FULLSCREEN ROBOT ================= */}
+                        {isFullscreen && (
+                            <div
+                                className={`
+                                    pointer-events-none
+                                    transition-all
+                                    duration-500
+                                    animate-floatRobot
+
+                                    ${isFullscreen
+                                        ? `
+                                        fixed
+                                        bottom-6
+                                        right-6
+                                        w-[320px]
+                                        h-[320px]
+                                        z-[10000]
+                                    `
+                                        : `
+                                        absolute
+                                        bottom-4
+                                        right-4
+                                        w-[140px]
+                                        h-[140px]
+                                        z-30
+                                    `
+                                    }
+                                `}
+                            >
+                                {/* Glow */}
+                                <div
+                                    className={`
+                                        absolute
+                                        inset-0
+                                        rounded-full
+                                        bg-cyan-400/20
+                                        blur-3xl
+                                        animate-pulse
+                                    `}
+                                />
+
+                                <Canvas
+                                    camera={{ position: [0, 0, 5], fov: 35 }}
+                                    gl={{ preserveDrawingBuffer: true }}
+                                >
+                                    <ambientLight intensity={1.8} />
+
+                                    <directionalLight
+                                        position={[3, 3, 3]}
+                                        intensity={2}
+                                    />
+
+                                    <pointLight
+                                        position={[-3, 2, 2]}
+                                        intensity={1.5}
+                                        color="#67e8f9"
+                                    />
+
+                                    <Suspense fallback={null}>
+                                        <Float
+                                            speed={3}
+                                            rotationIntensity={1}
+                                            floatIntensity={2}
+                                        >
+                                            <EveRobot aiData={aiData} />
+                                        </Float>
+
+                                        <Environment preset="city" />
+                                    </Suspense>
+                                </Canvas>
                             </div>
                         )}
-                        {/* Feed Camera & Digital Twin Overlay */}
+
+                        {/* ================= TIMER ================= */}
+                        {aiData?.sitting_seconds !== undefined &&
+                            aiData.sitting_seconds > 0 && (
+                                <div className="absolute top-8 right-8 z-30">
+                                    <div className="bg-orange-500/20 backdrop-blur-md border-2 border-orange-500 p-3 rounded-2xl flex flex-col items-end">
+                                        <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-1">
+                                            Thời gian ngồi
+                                        </span>
+
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-3xl font-black text-white tabular-nums">
+                                                {aiData.sitting_seconds || 0}
+                                            </span>
+
+                                            <span className="text-sm font-bold text-orange-500">
+                                                giây
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                        {/* ================= CAMERA FEED ================= */}
                         {cameraSource === 'device' ? (
                             <div className="relative w-full h-full overflow-hidden bg-black">
-                                {/* 1. Luồng Video gốc từ Backend */}
+
+                                {/* VIDEO */}
                                 <img
                                     src={
                                         lastFrame
@@ -332,57 +535,82 @@ const Vision: React.FC = () => {
                                     className="w-full h-full object-cover"
                                 />
 
-                                {/* 2. Hiệu ứng Radar Scanning (Chạy lên xuống) */}
+                                {/* RADAR */}
                                 <div className="absolute inset-0 pointer-events-none">
                                     <div className="w-full h-[2px] bg-cyan-400/30 shadow-[0_0_15px_rgba(34,211,238,0.8)] animate-scan" />
                                 </div>
 
-                                {/* 3. Lớp phủ Bounding Boxes (Digital Twin) */}
-                                {aiData.detected_objects && aiData.detected_objects.map((obj, index) => {
+                                {/* ================= OBJECT DETECTION ================= */}
+                                {aiData.detected_objects?.map((obj, index) => {
                                     const [x1, y1, x2, y2] = obj.bbox;
+
                                     const isTV = obj.label.toLowerCase().includes('tv');
                                     const isChair = obj.label.toLowerCase().includes('ghế');
-                                    const isSittingOn = isChair && aiData.sitting_seconds && aiData.sitting_seconds > 0;
+
+                                    const isSittingOn =
+                                        isChair &&
+                                        aiData.sitting_seconds &&
+                                        aiData.sitting_seconds > 0;
 
                                     return (
-                                        <div key={index} className="absolute pointer-events-none transition-all duration-300 ease-out"
+                                        <div
+                                            key={index}
+                                            className="absolute pointer-events-none transition-all duration-300 ease-out"
                                             style={{
-                                                // Luân dùng left/top/width/height dạng % là chuẩn nhất cho Responsive
                                                 left: `${(x1 / 640) * 100}%`,
                                                 top: `${(y1 / 480) * 100}%`,
                                                 width: `${((x2 - x1) / 640) * 100}%`,
                                                 height: `${((y2 - y1) / 480) * 100}%`,
 
-                                                // Đổi màu Border linh hoạt
-                                                border: `2px solid ${isTV ? '#3b82f6' :
-                                                    isSittingOn ? '#f97316' :
-                                                        '#22c55e'
+                                                border: `2px solid ${isTV
+                                                    ? '#3b82f6'
+                                                    : isSittingOn
+                                                        ? '#f97316'
+                                                        : '#22c55e'
                                                     }`,
 
-                                                // Hiệu ứng Glow khi đang ngồi hoặc có cảnh báo
                                                 boxShadow: isSittingOn
-                                                    ? '0 0 15px rgba(249, 115, 22, 0.5), inset 0 0 10px rgba(249, 115, 22, 0.2)'
+                                                    ? '0 0 15px rgba(249,115,22,0.5)'
                                                     : 'none',
+
                                                 borderRadius: '4px',
-                                                zIndex: isSittingOn ? 40 : 30
+                                                zIndex: 40,
                                             }}
                                         >
-                                            {/* Label Tag - Đưa lên trên cạnh của Box */}
-                                            <div className={`
-                                                    absolute -top-6 left-0 
-                                                    px-2 py-0.5 
-                                                    rounded-t-md 
-                                                    text-[10px] font-black text-white 
-                                                    flex items-center gap-1.5
-                                                    backdrop-blur-sm
-                                                    ${isTV ? 'bg-blue-600/90' : isSittingOn ? 'bg-orange-600/90' : 'bg-green-600/90'}
-                                                `}>
-                                                {/* Icon nhỏ minh họa cho xịn */}
-                                                {isTV ? <Monitor size={10} /> : isSittingOn ? <User size={10} /> : <Activity size={10} />}
+                                            {/* LABEL */}
+                                            <div
+                                                className={`
+                                    absolute
+                                    -top-6
+                                    left-0
+                                    px-2
+                                    py-0.5
+                                    rounded-t-md
+                                    text-[10px]
+                                    font-black
+                                    text-white
+                                    flex
+                                    items-center
+                                    gap-1.5
+                                    backdrop-blur-sm
+                                    ${isTV
+                                                        ? 'bg-blue-600/90'
+                                                        : isSittingOn
+                                                            ? 'bg-orange-600/90'
+                                                            : 'bg-green-600/90'
+                                                    }
+                                `}
+                                            >
+                                                {isTV ? (
+                                                    <Monitor size={10} />
+                                                ) : isSittingOn ? (
+                                                    <User size={10} />
+                                                ) : (
+                                                    <Activity size={10} />
+                                                )}
 
                                                 <span>{obj.label.toUpperCase()}</span>
 
-                                                {/* Hiển thị thời gian ngồi trực tiếp trên đầu object */}
                                                 {isSittingOn && (
                                                     <span className="ml-1 bg-white text-orange-600 px-1.5 rounded-sm animate-pulse flex items-center gap-0.5">
                                                         <Clock size={8} />
@@ -391,7 +619,7 @@ const Vision: React.FC = () => {
                                                 )}
                                             </div>
 
-                                            {/* Các góc của Box (Tạo cảm giác công nghệ AI Scan) */}
+                                            {/* CORNERS */}
                                             <div className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-inherit -mt-[2px] -ml-[2px]" />
                                             <div className="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-inherit -mt-[2px] -mr-[2px]" />
                                             <div className="absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-inherit -mb-[2px] -ml-[2px]" />
@@ -400,35 +628,47 @@ const Vision: React.FC = () => {
                                     );
                                 })}
 
-                                {/* 4. Cảnh báo đỏ nếu có Warning (Ngã, Khom lưng...) */}
+                                {/* WARNING */}
                                 {aiData.is_warning && (
                                     <div className="absolute inset-0 border-[10px] border-red-500/40 animate-pulse pointer-events-none shadow-[inset_0_0_50px_rgba(239,68,68,0.4)]" />
                                 )}
                             </div>
                         ) : (
                             <div className="relative w-full h-full bg-slate-900 flex items-center justify-center">
-                                <img src="https://images.unsplash.com/photo-1558002038-1055907df827?q=80&w=1200" className="w-full h-full object-cover opacity-40" alt="Home" />
+                                <img
+                                    src="https://images.unsplash.com/photo-1558002038-1055907df827?q=80&w=1200"
+                                    className="w-full h-full object-cover opacity-40"
+                                    alt="Home"
+                                />
+
                                 <div className="absolute text-slate-400 flex flex-col items-center">
                                     <Loader2 className="animate-spin mb-2" />
-                                    <span className="text-sm">Đang kết nối camera nhà...</span>
+                                    <span className="text-sm">
+                                        Đang kết nối camera nhà...
+                                    </span>
                                 </div>
                             </div>
                         )}
 
-                        {/* Phụ đề AI Response */}
+                        {/* ================= AI RESPONSE ================= */}
                         {aiResponseText && (
                             <div className="absolute bottom-28 left-1/2 -translate-x-1/2 w-[85%] z-30">
                                 <div className="bg-black/40 backdrop-blur-xl text-white p-5 rounded-[2rem] border border-white/20 animate-in slide-in-from-bottom-4 shadow-2xl">
-                                    <p className="text-[9px] font-black text-blue-400 uppercase mb-1 tracking-widest">{selectedRelative.name} ĐANG NHẮC:</p>
-                                    <p className="text-lg font-bold italic leading-tight leading-none text-blue-50">"{aiResponseText}"</p>
+                                    <p className="text-[9px] font-black text-blue-400 uppercase mb-1 tracking-widest">
+                                        {selectedRelative.name} ĐANG NHẮC:
+                                    </p>
+
+                                    <p className="text-lg font-bold italic leading-tight text-blue-50">
+                                        "{aiResponseText}"
+                                    </p>
                                 </div>
                             </div>
                         )}
 
-                        {/* Radar Giao Tiếp Tự Động */}
+                        {/* ================= MIC ================= */}
                         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30">
                             <div className="relative">
-                                {/* Sóng radar tỏa ra khi đang nghe */}
+
                                 {isListening && (
                                     <>
                                         <span className="absolute inset-0 rounded-full bg-blue-400 animate-ping opacity-20" />
@@ -436,69 +676,92 @@ const Vision: React.FC = () => {
                                     </>
                                 )}
 
-                                <div className={`p-6 rounded-full shadow-2xl transition-all duration-700 border-4 ${isListening ? 'bg-blue-600 border-blue-400 scale-110' :
-                                    isProcessing ? 'bg-indigo-600 border-indigo-400 animate-pulse' :
-                                        'bg-slate-700 border-slate-600 opacity-50'
-                                    }`}>
+                                <div
+                                    className={`
+                        p-6
+                        rounded-full
+                        shadow-2xl
+                        transition-all
+                        duration-700
+                        border-4
+                        ${isListening
+                                            ? 'bg-blue-600 border-blue-400 scale-110'
+                                            : isProcessing
+                                                ? 'bg-indigo-600 border-indigo-400 animate-pulse'
+                                                : 'bg-slate-700 border-slate-600 opacity-50'
+                                        }
+                    `}
+                                >
                                     {isProcessing ? (
                                         <div className="flex gap-1">
-                                            <span className="w-2 h-2 bg-white rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                                            <span className="w-2 h-2 bg-white rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                                            <span className="w-2 h-2 bg-white rounded-full animate-bounce"></span>
+                                            <span className="w-2 h-2 bg-white rounded-full animate-bounce [animation-delay:-0.3s]" />
+                                            <span className="w-2 h-2 bg-white rounded-full animate-bounce [animation-delay:-0.15s]" />
+                                            <span className="w-2 h-2 bg-white rounded-full animate-bounce" />
                                         </div>
                                     ) : isListening ? (
                                         <div className="relative">
-                                            <Mic className="text-white animate-pulse" size={28} />
-                                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white"></div>
+                                            <Mic
+                                                className="text-white animate-pulse"
+                                                size={28}
+                                            />
+
+                                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white" />
                                         </div>
                                     ) : (
                                         <MicOff className="text-white/50" size={28} />
                                     )}
                                 </div>
-
-                                {/* Trạng thái text phía dưới radar */}
-                                <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
-                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white drop-shadow-md">
-                                        {isListening ? "Hệ thống đang nghe..." : isProcessing ? "EVE đang trả lời..." : "Chế độ rảnh tay tắt"}
-                                    </span>
-                                </div>
                             </div>
                         </div>
 
-                        {/* Chọn nguồn Camera */}
-                        <div className="absolute top-8 left-8 z-20 flex gap-2 bg-black/20 backdrop-blur-md p-1.5 rounded-2xl border border-white/10">
-                            <button onClick={() => setCameraSource('device')} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black transition-all ${cameraSource === 'device' ? 'bg-white text-slate-900 shadow-xl' : 'text-white/70 hover:bg-white/10'}`}>
-                                <Camera size={14} /> CAMERA AI
-                            </button>
-                            <button onClick={() => setCameraSource('home')} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black transition-all ${cameraSource === 'home' ? 'bg-white text-slate-900 shadow-xl' : 'text-white/70 hover:bg-white/10'}`}>
-                                <HomeIcon size={14} /> PHÒNG KHÁCH
-                            </button>
-                        </div>
-                    </div>
+                        {/* ================= CONTROLS ================= */}
+                        <div className="absolute top-8 left-8 right-8 z-40 flex items-center justify-between">
 
-                    {/* Quản lý Giọng nói */}
-                    <div className="bg-white p-6 rounded-[3rem] border border-slate-100 shadow-sm space-y-5">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                                <div className="p-4 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl text-white shadow-lg shadow-blue-100">
-                                    <Volume2 size={24} />
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Thiết lập giọng nói</p>
-                                    <p className="text-base font-black text-slate-800">Mô phỏng: <span className="text-blue-600 uppercase">{selectedRelative.name}</span></p>
-                                </div>
-                            </div>
-                            <button className="flex items-center gap-2 bg-slate-900 hover:bg-blue-600 text-white px-6 py-3 rounded-2xl text-[10px] font-black transition-all shadow-lg">
-                                <UserPlus size={14} /> THÊM GIỌNG MỚI
-                            </button>
-                        </div>
-                        <div className="flex flex-wrap gap-2 pt-4 border-t border-slate-50">
-                            {relatives.map(r => (
-                                <button key={r.id} onClick={() => setSelectedRelative(r)} className={`px-6 py-3.5 rounded-2xl text-[10px] font-black transition-all flex items-center gap-2 border ${selectedRelative.id === r.id ? 'bg-blue-50 border-blue-200 text-blue-600 shadow-sm scale-105' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-200'}`}>
-                                    <User size={14} className={selectedRelative.id === r.id ? 'text-blue-500' : 'text-slate-300'} />
-                                    {r.name.toUpperCase()}
+                            <div className="flex gap-2 bg-black/20 backdrop-blur-md p-1.5 rounded-2xl border border-white/10">
+                                <button
+                                    onClick={() => setCameraSource('device')}
+                                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black transition-all ${cameraSource === 'device'
+                                        ? 'bg-white text-slate-900 shadow-xl'
+                                        : 'text-white/70 hover:bg-white/10'
+                                        }`}
+                                >
+                                    <Camera size={14} />
+                                    CAMERA AI
                                 </button>
-                            ))}
+
+                                <button
+                                    onClick={() => setCameraSource('home')}
+                                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black transition-all ${cameraSource === 'home'
+                                        ? 'bg-white text-slate-900 shadow-xl'
+                                        : 'text-white/70 hover:bg-white/10'
+                                        }`}
+                                >
+                                    <HomeIcon size={14} />
+                                    PHÒNG KHÁCH
+                                </button>
+                            </div>
+
+                            {/* FULLSCREEN BUTTON */}
+                            <button
+                                onClick={toggleFullscreen}
+                                className="
+                                    w-14
+                                    h-14
+                                    rounded-2xl
+                                    bg-black/30
+                                    backdrop-blur-xl
+                                    border
+                                    border-white/10
+                                    flex
+                                    items-center
+                                    justify-center
+                                    text-white
+                                    hover:scale-110
+                                    transition-all
+                                "
+                            >
+                                {isFullscreen ? <Minimize2 /> : <Maximize2 />}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -602,17 +865,6 @@ const Vision: React.FC = () => {
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    {/* Quick Tips */}
-                    <div className="bg-blue-600 rounded-[3rem] p-8 text-white relative overflow-hidden group shadow-xl shadow-blue-200">
-                        <div className="absolute top-0 right-0 p-4 opacity-20 group-hover:scale-110 transition-transform">
-                            <Info size={80} />
-                        </div>
-                        <h4 className="text-lg font-black uppercase tracking-tighter mb-2 relative z-10">Mẹo chăm sóc</h4>
-                        <p className="text-blue-100 text-xs font-medium leading-relaxed relative z-10 opacity-90">
-                            "Nội thường hay buồn vào buổi chiều, hãy chọn giọng của <b>{selectedRelative.name}</b> để trò chuyện cùng Nội nhé!"
-                        </p>
                     </div>
                 </div>
             </div>

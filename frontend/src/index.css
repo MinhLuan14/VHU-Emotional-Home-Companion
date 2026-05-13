@@ -107,3 +107,29 @@
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
+
+@keyframes floatRobot {
+  0% {
+    transform: translateY(0px) translateX(0px);
+  }
+
+  25% {
+    transform: translateY(-12px) translateX(-6px);
+  }
+
+  50% {
+    transform: translateY(0px) translateX(8px);
+  }
+
+  75% {
+    transform: translateY(10px) translateX(-4px);
+  }
+
+  100% {
+    transform: translateY(0px) translateX(0px);
+  }
+}
+
+.animate-floatRobot {
+  animation: floatRobot 8s ease-in-out infinite;
+}
