@@ -136,12 +136,32 @@ const Vision: React.FC = () => {
                 const sittingSeconds = data.posture?.sitting_seconds || data.status?.sitting_seconds || 0;
 
                 // 2. WARNING ENGINE (Nâng cấp độ nhạy)
+                // ================= WARNING ENGINE =================
+
+                const postureRisk = data.posture?.risk_level || "SAFE";
+
+                const postureStatus =
+                    data.posture?.status ||
+                    data.status?.text ||
+                    data.status ||
+                    "UNKNOWN";
+
                 const isWarning =
                     Boolean(data.is_warning || data.warning) ||
+
+                    // FALL DETECT
                     data.posture?.is_falling === true ||
-                    data.posture?.risk_level === "DANGER" ||
-                    statusText.includes("NGÃ") ||
-                    statusText.includes("FALLING");
+
+                    // BACKEND RISK
+                    postureRisk === "WARNING" ||
+                    postureRisk === "DANGER" ||
+
+                    // TEXT FALLBACK
+                    postureStatus.includes("NGỒI SAI") ||
+                    postureStatus.includes("KHOM LƯNG") ||
+                    postureStatus.includes("NGỒI QUÁ LÂU") ||
+                    postureStatus.includes("TÉ NGÃ") ||
+                    postureStatus.includes("FALL");
 
                 // 3. FACE & POSE SAFE
                 const face = {
@@ -154,7 +174,7 @@ const Vision: React.FC = () => {
                 // 4. STATE UPDATE
                 setAiData((prev) => ({
                     ...prev,
-                    status: statusText,
+                    status: postureStatus,
                     emotion: emotionText,
                     sitting_seconds: sittingSeconds,
                     face,

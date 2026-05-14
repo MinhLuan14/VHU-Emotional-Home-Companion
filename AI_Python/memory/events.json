@@ -1,600 +1,600 @@
 [
   {
-    "time": "12:34:58",
+    "time": "03:49:48",
+    "status": "🚨 CẢNH BÁO: TÉ NGÃ",
+    "emotion": "Buồn/Mệt mỏi",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "03:49:50",
+    "status": "✅ ĐỨNG THẲNG",
+    "emotion": "Buồn/Mệt mỏi",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "03:49:52",
+    "status": "✅ ĐỨNG THẲNG",
+    "emotion": "Ổn định",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "03:49:54",
+    "status": "✅ ĐỨNG THẲNG",
+    "emotion": "Buồn/Mệt mỏi",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "03:49:56",
     "status": "LOADING",
     "emotion": "Ổn định",
     "sitting_seconds": 0
   },
   {
-    "time": "12:35:00",
+    "time": "03:49:58",
     "status": "LOADING",
     "emotion": "Ổn định",
     "sitting_seconds": 0
   },
   {
-    "time": "12:35:02",
+    "time": "03:50:00",
     "status": "LOADING",
     "emotion": "Ổn định",
     "sitting_seconds": 0
   },
   {
-    "time": "12:35:04",
+    "time": "03:50:02",
+    "status": "✅ ĐỨNG THẲNG",
+    "emotion": "Ổn định",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "03:50:04",
+    "status": "✅ ĐỨNG THẲNG",
+    "emotion": "Ổn định",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "03:50:06",
+    "status": "✅ ĐỨNG THẲNG",
+    "emotion": "Ổn định",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "03:50:08",
+    "status": "✅ ĐỨNG THẲNG",
+    "emotion": "Ổn định",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "03:50:10",
+    "status": "✅ ĐỨNG THẲNG",
+    "emotion": "Ổn định",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "03:50:12",
+    "status": "LOADING",
+    "emotion": "Ổn định",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "03:50:14",
+    "status": "✅ ĐỨNG THẲNG",
+    "emotion": "Ổn định",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "03:50:16",
+    "status": "🚨 CẢNH BÁO: TÉ NGÃ",
+    "emotion": "Buồn/Mệt mỏi",
+    "sitting_seconds": 2
+  },
+  {
+    "time": "03:50:18",
     "status": "🧘 NGỒI NGHỈ",
-    "emotion": "Buồn/Mệt mỏi",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:06",
-    "status": "LOADING",
     "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:08",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:10",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:12",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:14",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:16",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:18",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:21",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:23",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:25",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:27",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:29",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:31",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:33",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:35",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Buồn/Mệt mỏi",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:37",
-    "status": "LOADING",
-    "emotion": "Vui vẻ",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:39",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:41",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:43",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:45",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:47",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:49",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:51",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:53",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:55",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:57",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:35:59",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:36:02",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:36:04",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:36:06",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:36:08",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:36:10",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:36:12",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:36:14",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:36:16",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:36:18",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:36:20",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:36:22",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:36:24",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:36:26",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:36:28",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:36:30",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:36:32",
-    "status": "LOADING",
-    "emotion": "Vui vẻ",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:36:34",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:36:36",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:36:38",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:36:40",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:36:43",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:36:45",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:36:47",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:36:49",
-    "status": "LOADING",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:37:13",
-    "status": "🙂 Nội đang sinh hoạt",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:37:15",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Buồn/Mệt mỏi",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:37:17",
-    "status": "🙂 Nội đang sinh hoạt",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:37:19",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:37:21",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Vui vẻ",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:37:23",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Vui vẻ",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:37:25",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:37:27",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:37:29",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:37:31",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:37:33",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Buồn/Mệt mỏi",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:37:36",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:37:38",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Buồn/Mệt mỏi",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:37:40",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Buồn/Mệt mỏi",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:37:42",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Buồn/Mệt mỏi",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:37:44",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:37:46",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:37:48",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:37:50",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:37:52",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:37:54",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:37:56",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:37:58",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:38:00",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:38:02",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:38:04",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:38:06",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:38:08",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:38:10",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:38:12",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:38:14",
-    "status": "✅ ĐỨNG THẲNG",
-    "emotion": "Ổn định",
-    "sitting_seconds": 0
-  },
-  {
-    "time": "12:38:16",
-    "status": "🪑 NGỒI SAI TƯ THẾ",
-    "emotion": "Vui vẻ",
     "sitting_seconds": 1
   },
   {
-    "time": "12:38:18",
+    "time": "03:50:20",
     "status": "🧘 NGỒI NGHỈ",
-    "emotion": "Buồn/Mệt mỏi",
+    "emotion": "Ổn định",
     "sitting_seconds": 3
   },
   {
-    "time": "12:38:20",
+    "time": "03:50:23",
     "status": "🧘 NGỒI NGHỈ",
-    "emotion": "Buồn/Mệt mỏi",
+    "emotion": "Ổn định",
     "sitting_seconds": 5
   },
   {
-    "time": "12:38:23",
+    "time": "03:50:25",
     "status": "🧘 NGỒI NGHỈ",
-    "emotion": "Buồn/Mệt mỏi",
+    "emotion": "Ổn định",
     "sitting_seconds": 7
   },
   {
-    "time": "12:38:25",
+    "time": "03:50:27",
     "status": "🧘 NGỒI NGHỈ",
     "emotion": "Ổn định",
-    "sitting_seconds": 10
+    "sitting_seconds": 9
   },
   {
-    "time": "12:38:27",
+    "time": "03:50:29",
     "status": "🧘 NGỒI NGHỈ",
     "emotion": "Ổn định",
     "sitting_seconds": 12
   },
   {
-    "time": "12:38:29",
+    "time": "03:50:31",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 14
+  },
+  {
+    "time": "03:50:33",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 16
+  },
+  {
+    "time": "03:50:35",
+    "status": "🙂 Nội đang sinh hoạt",
+    "emotion": "Ổn định",
+    "sitting_seconds": 18
+  },
+  {
+    "time": "03:50:37",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 20
+  },
+  {
+    "time": "03:50:39",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 22
+  },
+  {
+    "time": "03:50:41",
+    "status": "😊 Nội đang vui",
+    "emotion": "Vui vẻ",
+    "sitting_seconds": 24
+  },
+  {
+    "time": "03:50:44",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 26
+  },
+  {
+    "time": "03:50:46",
+    "status": "🙂 Nội đang sinh hoạt",
+    "emotion": "Ổn định",
+    "sitting_seconds": 28
+  },
+  {
+    "time": "03:50:48",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 30
+  },
+  {
+    "time": "03:50:50",
+    "status": "🙂 Nội đang sinh hoạt",
+    "emotion": "Ổn định",
+    "sitting_seconds": 33
+  },
+  {
+    "time": "03:50:52",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 35
+  },
+  {
+    "time": "03:50:54",
+    "status": "🙂 Nội đang sinh hoạt",
+    "emotion": "Ổn định",
+    "sitting_seconds": 37
+  },
+  {
+    "time": "03:50:56",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 39
+  },
+  {
+    "time": "03:50:58",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 41
+  },
+  {
+    "time": "03:51:00",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 43
+  },
+  {
+    "time": "03:51:02",
+    "status": "🙂 Nội đang sinh hoạt",
+    "emotion": "Ổn định",
+    "sitting_seconds": 45
+  },
+  {
+    "time": "03:51:04",
     "status": "✅ ĐỨNG THẲNG",
     "emotion": "Ổn định",
     "sitting_seconds": 0
   },
   {
-    "time": "12:38:31",
+    "time": "03:51:06",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 2
+  },
+  {
+    "time": "03:51:08",
     "status": "✅ ĐỨNG THẲNG",
     "emotion": "Ổn định",
     "sitting_seconds": 0
   },
   {
-    "time": "12:38:33",
+    "time": "03:51:11",
     "status": "✅ ĐỨNG THẲNG",
     "emotion": "Ổn định",
     "sitting_seconds": 0
   },
   {
-    "time": "12:38:35",
-    "status": "✅ ĐỨNG THẲNG",
+    "time": "03:51:34",
+    "status": "😔 Nội có vẻ mệt",
     "emotion": "Buồn/Mệt mỏi",
     "sitting_seconds": 0
   },
   {
-    "time": "12:38:37",
-    "status": "✅ ĐỨNG THẲNG",
+    "time": "03:51:36",
+    "status": "🧘 NGỒI NGHỈ",
     "emotion": "Buồn/Mệt mỏi",
-    "sitting_seconds": 0
+    "sitting_seconds": 1
   },
   {
-    "time": "12:38:39",
+    "time": "03:51:38",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 3
+  },
+  {
+    "time": "03:51:40",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 6
+  },
+  {
+    "time": "03:51:42",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 8
+  },
+  {
+    "time": "03:51:45",
     "status": "✅ ĐỨNG THẲNG",
     "emotion": "Ổn định",
     "sitting_seconds": 0
   },
   {
-    "time": "12:38:41",
+    "time": "03:51:47",
     "status": "✅ ĐỨNG THẲNG",
     "emotion": "Ổn định",
     "sitting_seconds": 0
   },
   {
-    "time": "12:38:43",
+    "time": "03:51:49",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "03:51:51",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 2
+  },
+  {
+    "time": "03:51:53",
+    "status": "✅ ĐỨNG THẲNG",
+    "emotion": "Ổn định",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "03:51:55",
+    "status": "✅ ĐỨNG THẲNG",
+    "emotion": "Ổn định",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "03:51:57",
+    "status": "✅ ĐỨNG THẲNG",
+    "emotion": "Ổn định",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "03:51:59",
+    "status": "✅ ĐỨNG THẲNG",
+    "emotion": "Ổn định",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "03:52:01",
+    "status": "✅ ĐỨNG THẲNG",
+    "emotion": "Ổn định",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "03:52:03",
+    "status": "✅ ĐỨNG THẲNG",
+    "emotion": "Ổn định",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "03:52:05",
+    "status": "✅ ĐỨNG THẲNG",
+    "emotion": "Ổn định",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "03:52:07",
+    "status": "✅ ĐỨNG THẲNG",
+    "emotion": "Ổn định",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "03:52:09",
+    "status": "✅ ĐỨNG THẲNG",
+    "emotion": "Ổn định",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "03:52:11",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 1
+  },
+  {
+    "time": "03:52:13",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 3
+  },
+  {
+    "time": "03:52:15",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 5
+  },
+  {
+    "time": "03:52:17",
+    "status": "🛏️ Nội đang nghỉ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 7
+  },
+  {
+    "time": "03:52:20",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 9
+  },
+  {
+    "time": "03:52:22",
+    "status": "🛏️ Nội đang nghỉ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 11
+  },
+  {
+    "time": "03:52:24",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 13
+  },
+  {
+    "time": "03:52:26",
+    "status": "🛏️ Nội đang nghỉ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 15
+  },
+  {
+    "time": "03:52:28",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 17
+  },
+  {
+    "time": "03:52:30",
+    "status": "🛏️ Nội đang nghỉ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 19
+  },
+  {
+    "time": "03:52:32",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 21
+  },
+  {
+    "time": "03:52:34",
+    "status": "🛏️ Nội đang nghỉ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 23
+  },
+  {
+    "time": "03:52:36",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 25
+  },
+  {
+    "time": "03:52:38",
+    "status": "🛏️ Nội đang nghỉ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 27
+  },
+  {
+    "time": "03:52:40",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 29
+  },
+  {
+    "time": "03:52:42",
+    "status": "🛏️ Nội đang nghỉ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 32
+  },
+  {
+    "time": "03:52:44",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 34
+  },
+  {
+    "time": "03:52:46",
+    "status": "🛏️ Nội đang nghỉ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 36
+  },
+  {
+    "time": "03:52:48",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 38
+  },
+  {
+    "time": "03:52:50",
+    "status": "🛏️ Nội đang nghỉ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 40
+  },
+  {
+    "time": "03:52:52",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 42
+  },
+  {
+    "time": "03:52:54",
+    "status": "🛏️ Nội đang nghỉ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 44
+  },
+  {
+    "time": "03:52:57",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 46
+  },
+  {
+    "time": "03:52:59",
+    "status": "🛏️ Nội đang nghỉ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 48
+  },
+  {
+    "time": "03:53:01",
+    "status": "Ami nói: Ngoại ơi ngồi thẳng lưng lên nhen.",
+    "emotion": "Ami_Speaking",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "03:53:01",
+    "status": "🪑 NGỒI SAI TƯ THẾ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 50
+  },
+  {
+    "time": "03:53:03",
+    "status": "🙂 Nội đang sinh hoạt",
+    "emotion": "Ổn định",
+    "sitting_seconds": 52
+  },
+  {
+    "time": "03:53:05",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 54
+  },
+  {
+    "time": "03:53:07",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 56
+  },
+  {
+    "time": "03:53:09",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 58
+  },
+  {
+    "time": "03:53:11",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 61
+  },
+  {
+    "time": "03:53:13",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 62
+  },
+  {
+    "time": "03:53:15",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 65
+  },
+  {
+    "time": "03:53:17",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 67
+  },
+  {
+    "time": "03:53:19",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 69
+  },
+  {
+    "time": "03:53:21",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Vui vẻ",
+    "sitting_seconds": 71
+  },
+  {
+    "time": "03:53:23",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Vui vẻ",
+    "sitting_seconds": 73
+  },
+  {
+    "time": "03:53:25",
+    "status": "🧘 NGỒI NGHỈ",
+    "emotion": "Ổn định",
+    "sitting_seconds": 75
+  },
+  {
+    "time": "03:53:27",
+    "status": "✅ ĐỨNG THẲNG",
+    "emotion": "Ổn định",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "03:53:30",
+    "status": "✅ ĐỨNG THẲNG",
+    "emotion": "Ổn định",
+    "sitting_seconds": 0
+  },
+  {
+    "time": "03:53:32",
     "status": "✅ ĐỨNG THẲNG",
     "emotion": "Ổn định",
     "sitting_seconds": 0

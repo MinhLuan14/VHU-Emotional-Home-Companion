@@ -117,14 +117,13 @@ class EventEngine:
 
     def detect_event(self, context):
         events = []
-
         status = context.get("status", "")
-        if "Ami nói" in status:
-            return []
+        if "Ami nói" in status: return []
+        
         pose = context.get("posture", {})
-
         is_falling = pose.get("is_falling", False)
         is_sitting = pose.get("is_sitting", False)
+        risk_level = pose.get("risk_level", "") # Lấy risk_level từ PoseDetector
 
         now = time.time()
 
@@ -134,18 +133,16 @@ class EventEngine:
 
         # ===== EVENT 2: SIT TOO LONG =====
         sitting_seconds = context.get("sitting_seconds", 0)
-        if is_sitting and sitting_seconds > 60:
-            last = self.last_event_time.get("SIT_TOO_LONG", 0)
-            if now - last > 300:
-                events.append("SIT_TOO_LONG")
-                self.last_event_time["SIT_TOO_LONG"] = now
+        if is_sitting and sitting_seconds > 1800: # Ví dụ 30 phút
+            events.append("SIT_TOO_LONG")
 
-        # ===== UPDATE STATE =====
-        self.prev_state = {
-            "status": status,
-            "is_falling": is_falling,
-            "is_sitting": is_sitting
-        }
+        # ===== EVENT 3: BAD POSTURE (THÊM DÒNG NÀY) =====
+        if risk_level == "WARNING" and "NGỒI SAI TƯ THẾ" in status:
+            # Cooldown để tránh Ami nhắc liên tục gây khó chịu (45 giây)
+            last = self.last_event_time.get("BAD_POSTURE", 0)
+            if now - last > 45: 
+                events.append("BAD_POSTURE")
+                self.last_event_time["BAD_POSTURE"] = now
 
         return events
 obj_detector = ObjectDetector()
@@ -171,7 +168,8 @@ ai_state = {
 face_tracking = {"x": 0.5, "y": 0.5}
 last_warning_time = 0
 WARNING_COOLDOWN = 30 
-
+LAST_POSTURE_WARNING = 0
+POSTURE_WARNING_COOLDOWN = 45
 class ChatRequest(BaseModel):
     user_input: str
 def sync_worker():
@@ -330,8 +328,8 @@ start_app_time = time.time()
 LAST_INTERACTION_TIME = time.time()
 IDLE_REMIND_DELAY = 600  # 10 phút
 LAST_IDLE_REMIND = 0
-IDLE_REMIND_COOLDOWN = 10 # 10 phút mới nhắc lại
-START_DELAY = 5        # delay khi mới mở app
+IDLE_REMIND_COOLDOWN = 1000 # 10 phút mới nhắc lại
+START_DELAY = 12       # delay khi mới mở app
 long_term_memory = VectorMemory(max_memory=1000)
 def update_user_activity():
     global LAST_INTERACTION_TIME
@@ -340,24 +338,22 @@ def is_user_idle():
     idle_time = time.time() - LAST_INTERACTION_TIME
     return idle_time >= IDLE_REMIND_DELAY
 def trigger_remind_logic(status_text, emotion, objects=None, history_context="", event_type=None):
+    global LAST_IDLE_REMIND, last_sent_status, last_remind_time
 
-    global LAST_IDLE_REMIND
-
-    # AI đang nói -> bỏ qua
+    # 1. Chỉ chặn khi đang nói thật sự
     if ai_state.get("is_ai_speaking"):
         return
 
-    # Chưa idle đủ lâu
-     #if not is_user_idle():
-        # return
+    # 2. ÉP event_type (Để demo luôn chạy khi có WARNING)
+    # Nếu truyền vào risk_level là WARNING thì tự hiểu là BAD_POSTURE
+    if event_type is None:
+        return 
 
+    # 3. Tạm thời nới lỏng Cooldown để quay Clip demo
     now = time.time()
-
-    # Cooldown chống spam
-    if now - LAST_IDLE_REMIND < IDLE_REMIND_COOLDOWN:
+    if now - LAST_IDLE_REMIND < 5: # Chỉ đợi 5s thay vì 30s
         return
-    if not event_type:
-        return
+    
     LAST_IDLE_REMIND = now
     global last_sent_status, last_remind_time
     # ===== 1. BLOCK khi AI đang nói =====
@@ -403,11 +399,12 @@ def trigger_remind_logic(status_text, emotion, objects=None, history_context="",
             f"NHIỆM VỤ:\n"
             f"1. Nếu {event_type} là 'SIT_TOO_LONG', hãy khuyên nội đứng dậy đi lại cho khỏe chân nhen.\n"
             f"2. Nếu {event_type} là 'FALL_DETECTED', phải hỏi thăm thật lòng: 'Nội ơi nội có sao không nội?'.\n"
-            f"3. TUYỆT ĐỐI KHÔNG lặp lại ý hệt những câu trong mục 'CON ĐÃ NÓI GÌ TRƯỚC ĐÓ'.\n"
-            f"4. Văn phong: Ngọt ngào, dùng từ: nhen, nha nội, đó nội, nghen.\n"
-            f"5. CHỈ 1 CÂU DUY NHẤT (< 20 từ)."
-            f"6. Nếu không có sự kiện rõ ràng (FALL_DETECTED hoặc SIT_TOO_LONG) → trả về ''. KHÔNG được tự nói chuyện.\n"
-            f"7. KHÔNG được nói các câu như 'con không hiểu', 'con không nghe rõ', 'nội nói lại'.\n"
+            f"3. Nếu {event_type} là 'BAD_POSTURE', hãy nhắc nội ngồi thẳng lưng lên nhen.\n" # THÊM DÒNG NÀY
+            f"4. TUYỆT ĐỐI KHÔNG lặp lại ý hệt những câu trong mục 'CON ĐÃ NÓI GÌ TRƯỚC ĐÓ'.\n"
+            f"5. Văn phong: Ngọt ngào, dùng từ: nhen, nha nội, đó nội, nghen.\n"
+            f"6. CHỈ 1 CÂU DUY NHẤT (< 20 từ)."
+            f"7. Nếu không có sự kiện rõ ràng (FALL_DETECTED hoặc SIT_TOO_LONG) → trả về ''. KHÔNG được tự nói chuyện.\n"
+            f"8. KHÔNG được nói các câu như 'con không hiểu', 'con không nghe rõ', 'nội nói lại'.\n"
         )
 
         # ===== CALL GROQ =====
@@ -729,6 +726,7 @@ async def websocket_video(websocket: WebSocket):
         print(f"Websocket closed: {e}")
 @app.get("/api/ai/status")
 async def get_status():
+    
     return {
         "status": current_ai_status.get("status", "Bình thường"),
         "emotion": current_ai_status.get("emotion", "Ổn định"),
@@ -758,6 +756,9 @@ async def chat(req: ChatRequest):
            "VAI DIỄN: Bạn là AMI, đứa cháu nội hiếu thảo, luôn ở bên hủ hỉ với nội. "
             "PHONG CÁCH: Lễ phép, ấm áp, rặt mùi miền Nam (ngọt ngào, chân thành). "
             "XƯNG HÔ: Luôn gọi mình là 'con', gọi bà là 'nội'. CẤM gọi nội là 'bạn', 'bà' hoặc 'người dùng'. "
+            "XỬ LÝ KHI MỚI BẮT ĐẦU / IM LẶNG:\n"
+            "- Nếu dữ liệu đầu vào trống hoặc mập mờ, KHÔNG ĐƯỢC hỏi 'Nội nói gì con không nghe'.\n"
+            "- Thay vào đó, hãy chủ động chào hoặc khơi gợi chuyện: 'Dạ nội ơi, con đang nghe nội nè, nội có gì vui kể con nghe với nhen'.\n\n"
             "NGỮ PHÁP MIỀN NAM: "
             "- Phải có từ 'Dạ' hoặc 'Nội ơi' ở đầu mỗi câu. "
             "- Kết thúc câu bằng các từ: nhen, nha nội, đó nội, nè, nghen, hà. "

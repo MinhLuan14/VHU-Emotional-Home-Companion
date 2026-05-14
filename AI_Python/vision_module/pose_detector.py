@@ -195,12 +195,26 @@ class PoseDetector:
         if 11 in pts and 12 in pts:
             sh_dist = math.hypot(pts[11][0]-pts[12][0], pts[11][1]-pts[12][1])
 
+        # --- TÍNH TOÁN CÁC BIẾN CÒN THIẾU ---
+        # 1. Tính back_angle để truyền vào pose_ctx
+        back_angle = 0
+        if 11 in pts and 23 in pts and 25 in pts:
+            back_angle = self._angle(pts[11], pts[23], pts[25])
+
+        # 2. Tính velocity (tốc độ thay đổi tọa độ hông - dùng để hỗ trợ detect fall)
+        velocity = 0
+        if 23 in pts:
+            curr_hip_y = pts[23][1]
+            # Lưu tọa độ hông cũ để tính vận tốc (nếu cần xử lý nâng cao)
+            # Ở đây mình tạm để 0.0 hoặc tính toán đơn giản nếu bạn có buffer tọa độ
+            velocity = 0.0 
+
         is_fall = self.detect_fall(pts)
         is_sitting = self.detect_sitting(pts, sh_dist)
         sit_time = self.sitting_duration(is_sitting)
         posture_score = self.detect_posture_score(pts)
 
-        # 1. Xác định status hiện tại (Đảm bảo không bao giờ là None)
+        # 1. Xác định status hiện tại
         status = "LOADING"
         risk = "SAFE"
         color = (0,255,0)
@@ -208,9 +222,10 @@ class PoseDetector:
         if is_fall:
             status, risk, color = "🚨 CẢNH BÁO: TÉ NGÃ", "DANGER", (0, 0, 255)
         elif is_sitting:
-            if sit_time > 1800: # Ví dụ 30 phút
+            # Luân có thể chỉnh lại mức posture_score ở đây để AI nhắc nhở sớm hơn
+            if sit_time > 1800: 
                 status, risk, color = "⚠️ NGỒI QUÁ LÂU", "WARNING", (0, 120, 255)
-            elif posture_score < 50:
+            elif posture_score < 70: # Tăng lên 70 để dễ trigger WARNING khi demo
                 status, risk, color = "🪑 NGỒI SAI TƯ THẾ", "WARNING", (0, 165, 255)
             else:
                 status, risk, color = "🧘 NGỒI NGHỈ", "SAFE", (255, 255, 255)
@@ -218,28 +233,32 @@ class PoseDetector:
             status, risk, color = "⚠️ ĐANG KHOM LƯNG", "WARNING", (0, 165, 255)
         else:
             status, risk, color = "✅ ĐỨNG THẲNG", "SAFE", (0, 255, 0)
+        
+        
 
-        # 2. CƠ CHẾ RESET BUFFER AN TOÀN
-        # Dùng list comprehension để tránh NoneType khi duyệt buffer
+        # 2. CƠ CHẾ RESET BUFFER
         if not is_sitting and self.posture_buffer:
             if any("NGỒI" in str(s) for s in self.posture_buffer if s):
                 self.posture_buffer.clear()
 
-        # 3. THÊM VÀO BUFFER TRƯỚC KHI TÍNH TOÁN FINAL_STATUS
+        # 3. THÊM VÀO BUFFER
         self.posture_buffer.append(status)
 
-        # 4. TÍNH TOÁN TRẠNG THÁI CUỐI CÙNG (Tránh lỗi max() trên tập rỗng)
+        # 4. TÍNH TOÁN TRẠNG THÁI CUỐI CÙNG
         valid_items = [str(s) for s in self.posture_buffer if s is not None]
         if valid_items:
             final_status = max(set(valid_items), key=valid_items.count)
         else:
             final_status = status
 
+        # Đóng gói dữ liệu (Đã có back_angle và velocity)
         pose_ctx = {
             "is_falling": is_fall,
             "is_sitting": is_sitting,
             "sitting_seconds": sit_time,
             "posture_score": posture_score,
+            "back_angle": back_angle, 
+            "velocity": velocity,
             "risk_level": risk,
             "status": final_status
         }
