@@ -193,23 +193,24 @@ def sync_worker():
         except Exception as e:
             print("❌ Sync error:", e)
 # ================== MEMORY IO ==================
+def save_json(path, data):
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+    except Exception as e:
+        print(f"❌ LỖI GHI FILE {os.path.basename(path)}: {e}")
+
 def load_json(path, default):
-    if not os.path.exists(path):
+    if not os.path.exists(path) or os.path.getsize(path) == 0:
         return default
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
-        print("⚠️ load_json lỗi:", e)
+        print(f"⚠️ LỖI ĐỌC FILE {os.path.basename(path)}: {e}")
         return default
-
-
-def save_json(path, data):
-    try:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        print("⚠️ save_json lỗi:", e)
         # ================== MEMORY LOG ==================
 def log_event(context):
     events = load_json(EVENTS_PATH, [])
@@ -266,14 +267,12 @@ def load_stats():
     })
 def update_stats(context):
     stats = load_stats()
-
     if context.get("sitting_seconds", 0) > 5:
         stats.setdefault("sitting_durations", []).append(context["sitting_seconds"])
-
-    # giữ tối đa 100 mẫu
     stats["sitting_durations"] = stats["sitting_durations"][-100:]
-
     save_json(STATS_PATH, stats)
+    if len(stats["sitting_durations"]) % 10 == 0:
+        update_adaptive_threshold()
 # ================== WRAPPER ĐỂ GỌI WORKER ==================
 def start_voice_thread(text: str):
     update_user_activity()
@@ -357,7 +356,8 @@ def trigger_remind_logic(status_text, emotion, objects=None, history_context="",
     # Cooldown chống spam
     if now - LAST_IDLE_REMIND < IDLE_REMIND_COOLDOWN:
         return
-
+    if not event_type:
+        return
     LAST_IDLE_REMIND = now
     global last_sent_status, last_remind_time
     # ===== 1. BLOCK khi AI đang nói =====
@@ -406,6 +406,8 @@ def trigger_remind_logic(status_text, emotion, objects=None, history_context="",
             f"3. TUYỆT ĐỐI KHÔNG lặp lại ý hệt những câu trong mục 'CON ĐÃ NÓI GÌ TRƯỚC ĐÓ'.\n"
             f"4. Văn phong: Ngọt ngào, dùng từ: nhen, nha nội, đó nội, nghen.\n"
             f"5. CHỈ 1 CÂU DUY NHẤT (< 20 từ)."
+            f"6. Nếu không có sự kiện rõ ràng (FALL_DETECTED hoặc SIT_TOO_LONG) → trả về ''. KHÔNG được tự nói chuyện.\n"
+            f"7. KHÔNG được nói các câu như 'con không hiểu', 'con không nghe rõ', 'nội nói lại'.\n"
         )
 
         # ===== CALL GROQ =====
@@ -549,7 +551,7 @@ def ai_worker():
             # =========================
             # 2. PREPROCESS
             # =========================
-            ai_frame = cv2.resize(frame, (480, 360))
+            ai_frame = cv2.resize(frame, (640, 480))
 
             # =========================
             # 3. POSE DETECTION
@@ -566,6 +568,13 @@ def ai_worker():
                 continue
 
             status_text, color, sitting_seconds, pose_ctx = pose_result
+            print("POSE DEBUG:", {
+                "is_falling": pose_ctx.get("is_falling"),
+                "back_angle": pose_ctx.get("back_angle"),
+                "velocity": pose_ctx.get("velocity"),
+                "risk_level": pose_ctx.get("risk_level"),
+                "status_text": status_text
+            })
             #print("POSE_CTX:", pose_ctx)
             # =========================
             # 4. OBJECT DETECTION (SKIP FRAME)
@@ -589,24 +598,7 @@ def ai_worker():
                 emotion = "unknown"
 
             emotion = emotion or "unknown"
-
-            # =========================
-            # 6. HAND DETECTION
-            # =========================
-            gesture = "NONE"
-            fingers = [0, 0, 0, 0, 0]
-
-            try:
-                if pose_lms:
-                    frame_hand = hand_detector.findHands(ai_frame)
-                    hand_lms = hand_detector.getPosition(frame_hand)
-
-                    if hand_lms:
-                        fingers = hand_detector.fingersUp()
-                        gesture = hand_detector.getGestureAction(fingers)
-            except Exception:
-                pass
-
+           
             # =========================
             # 7. BRAIN PROCESS
             # =========================
@@ -629,20 +621,30 @@ def ai_worker():
             # 8. UPDATE GLOBAL STATE
             # =========================
             is_warning_by_text = detect_warning(final_status)
-            is_warning_by_pose = pose_ctx.get("is_falling", False) or pose_ctx.get("risk_level") == "DANGER"
-            is_warning = is_warning_by_text or is_warning_by_pose
+            back_angle = pose_ctx.get("back_angle", 0)
+            velocity = pose_ctx.get("velocity", 0)
+            is_falling = pose_ctx.get("is_falling", False)
 
+            is_real_fall = is_falling and velocity > 0.8 and back_angle > 70
+            is_slouching = back_angle > 35 and back_angle <= 70
+
+            is_warning_by_pose = is_real_fall
+            is_warning = is_warning_by_text or is_warning_by_pose
+            print(f"[POSE] fall={is_falling} angle={back_angle:.1f} vel={velocity:.2f}")
             current_ai_status.update({
                 "status": final_status,
                 "emotion": emotion,
                 "sitting_seconds": int(sitting_seconds or 0),
-                "fingers": fingers,
-                "gesture": gesture,
                 "is_warning": is_warning,
                 "full_objects_data": objects or [],
                 "posture": pose_ctx  
             })
-
+            now_ts = time.time()
+            global last_log_time
+            if now_ts - last_log_time > 2: # Cứ 2 giây lưu log 1 lần để tránh nát ổ cứng
+                log_event(current_ai_status)
+                update_stats(current_ai_status)
+                last_log_time = now_ts
             # =========================
             # 9. EVENT ENGINE
             # =========================
@@ -747,10 +749,11 @@ async def get_status():
 @app.post("/api/ai/chat")
 async def chat(req: ChatRequest):
     update_user_activity()
-    if ai_state.get("is_ai_speaking"):
-        return {"text": "Chờ con xíu nhen...", "audio": None}
+    if ai_state.get("is_ai_speaking") or ai_state.get("is_thinking", False):
+        return {"text": "Dạ nội chờ con xíu, con đang nghe nè...", "audio": None}
 
     try:
+        ai_state["is_thinking"] = True
         SYSTEM_PROMPT_CHAT = (
            "VAI DIỄN: Bạn là AMI, đứa cháu nội hiếu thảo, luôn ở bên hủ hỉ với nội. "
             "PHONG CÁCH: Lễ phép, ấm áp, rặt mùi miền Nam (ngọt ngào, chân thành). "
@@ -779,6 +782,9 @@ async def chat(req: ChatRequest):
         return {"text": text, "audio": ai_state["current_audio_url"]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # Xong việc thì tắt cờ suy nghĩ
+        ai_state["is_thinking"] = False
 @app.on_event("shutdown")
 def shutdown_event():
     global running, cap
@@ -812,4 +818,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"‼️ LỖI HỆ THỐNG DẪN ĐẾN TREO: {e}")
         import traceback
-        traceback.print_exc() # Dòng này sẽ in ra chi tiết lỗi ở đâu
+        traceback.print_exc() 

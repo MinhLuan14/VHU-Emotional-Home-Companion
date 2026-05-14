@@ -29,7 +29,7 @@ class PoseDetector:
         # sitting tracking
         self.sitting_start = None
         self.sitting_history = deque(maxlen=20)
-
+        self.fall_buffer = deque(maxlen=10)
         # risk smoothing
         self.risk_history = deque(maxlen=10)
 
@@ -81,47 +81,87 @@ class PoseDetector:
             return 0
 
     # ================= FALL =================
-    def detect_fall(self, pts):
+    def detect_fall(self, pts, is_sitting=False, is_slouch=False):
+
         if 0 not in pts or 23 not in pts or 24 not in pts:
             return False
 
-        nose = pts[0][1]
-        hip_y = (pts[23][1] + pts[24][1]) / 2
+        nose = np.array(pts[0][:2])
+        l_hip = np.array(pts[23][:2])
+        r_hip = np.array(pts[24][:2])
+        hip = (l_hip + r_hip) / 2
 
-        y = [p[1] for p in pts.values() if p[2] > 0.5]
-        x = [p[0] for p in pts.values() if p[2] > 0.5]
+        # ================================
+        # 1. BODY ORIENTATION (quan trọng nhất)
+        # ================================
+        body_vec = nose - hip
+        vertical_vec = np.array([0, -1])  # trục Y đi xuống
 
-        if not y or not x:
+        # cosine similarity (độ nghiêng cơ thể)
+        norm_body = np.linalg.norm(body_vec)
+        if norm_body == 0:
             return False
 
-        h = max(y) - min(y)
-        w = max(x) - min(x)
+        cos_angle = np.dot(body_vec, vertical_vec) / (norm_body * 1.0)
+        cos_angle = np.clip(cos_angle, -1.0, 1.0)
 
-        horizontal = w > h * 0.85
-        head_drop = abs(nose - hip_y) < 120
+        body_angle = np.degrees(np.arccos(cos_angle))
 
-        if horizontal and head_drop:
-            self.fall_counter += 1
-        else:
-            self.fall_counter = max(0, self.fall_counter - 1)
+        # ================================
+        # 2. HEIGHT DROP CHECK
+        # ================================
+        y_coords = [p[1] for p in pts.values() if p[2] > 0.5]
+        if not y_coords:
+            return False
 
-        return self.fall_counter > 5
+        h_person = max(y_coords) - min(y_coords)
 
+        # ================================
+        # 3. FALL CONDITIONS (MỚI)
+        # ================================
+
+        # NGÃ thật = cơ thể gần ngang + head thấp bất thường
+        is_laying = body_angle > 60          # quan trọng nhất
+        is_flat = h_person < 0.6 * np.ptp(y_coords) if len(y_coords) > 2 else False
+
+        head_drop = nose[1] > hip[1] + (h_person * 0.25)
+
+        raw_fall = is_laying and head_drop
+
+        # ================================
+        # 4. BUFFER STABILITY
+        # ================================
+        self.fall_buffer.append(raw_fall)
+
+        # tăng độ nhạy nhưng vẫn ổn định
+        if len(self.fall_buffer) < 5:
+            return False
+
+        return self.fall_buffer.count(True) >= 4
     # ================= POSTURE =================
     def detect_posture_score(self, pts):
         score = 100
-
-        # shoulders
+        
+        # --- Check 1: Độ lệch vai (Cân bằng hông) ---
         if 11 in pts and 12 in pts:
-            diff = abs(pts[11][1] - pts[12][1])
-            if diff > 80:
-                score -= 20
+            shoulder_tilt = abs(pts[11][1] - pts[12][1])
+            if shoulder_tilt > 45: score -= 15
 
-        # stooping
+        # --- Check 2: Khom lưng (Góc tạo bởi Vai - Hông - Đầu gối) ---
+        # Nếu góc này nhỏ hơn 150 độ tức là lưng đang bị gập về trước
         if 11 in pts and 23 in pts and 25 in pts:
-            angle = self._angle(pts[11], pts[23], pts[25])
-            if angle < 155:
-                score -= 25
+            back_angle = self._angle(pts[11], pts[23], pts[25])
+            if back_angle < 155:
+                # Trừ điểm nặng nếu khom sâu
+                penalty = int((155 - back_angle) * 1.5)
+                score -= min(40, penalty)
+
+        # --- Check 3: Chúi đầu (Tai so với Vai) ---
+        # Giúp phát hiện hội chứng "cổ rùa" khi xem điện thoại/đọc sách
+        if 7 in pts and 11 in pts: # Tai trái và Vai trái
+            head_forward = pts[11][1] - pts[7][1] 
+            if head_forward < 20: # Tai quá gần hoặc vượt quá vai theo trục Y
+                score -= 15
 
         return max(0, score)
 
@@ -166,16 +206,18 @@ class PoseDetector:
         color = (0,255,0)
 
         if is_fall:
-            status, risk, color = "🚨 NGÃ NGUY HIỂM", "DANGER", (0,0,255)
+            status, risk, color = "🚨 CẢNH BÁO: TÉ NGÃ", "DANGER", (0, 0, 255)
         elif is_sitting:
-            if sit_time > 60:
-                status, risk, color = "⚠️ NGỒI QUÁ LÂU", "WARNING", (0,120,255)
+            if sit_time > 1800: # Ví dụ 30 phút
+                status, risk, color = "⚠️ NGỒI QUÁ LÂU", "WARNING", (0, 120, 255)
+            elif posture_score < 50:
+                status, risk, color = "🪑 NGỒI SAI TƯ THẾ", "WARNING", (0, 165, 255)
             else:
-                status, risk, color = "🧘 NGỒI NGHỈ", "SAFE", (255,255,255)
-        elif posture_score < 40:
-            status, risk, color = "⚠️ TƯ THẾ XẤU", "WARNING", (0,165,255)
+                status, risk, color = "🧘 NGỒI NGHỈ", "SAFE", (255, 255, 255)
+        elif posture_score < 55:
+            status, risk, color = "⚠️ ĐANG KHOM LƯNG", "WARNING", (0, 165, 255)
         else:
-            status = "✅ BÌNH THƯỜNG"
+            status, risk, color = "✅ ĐỨNG THẲNG", "SAFE", (0, 255, 0)
 
         # 2. CƠ CHẾ RESET BUFFER AN TOÀN
         # Dùng list comprehension để tránh NoneType khi duyệt buffer

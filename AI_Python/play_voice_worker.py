@@ -3,6 +3,7 @@ import uuid
 import time
 import threading
 import torch
+import wave
 from lip_sync_generator import generate_lip_sync
 import glob
 
@@ -26,6 +27,7 @@ def clean_old_audio_files(audio_dir, max_files=5):
         print(f"⚠️ Cleanup error: {e}")
 
 def play_voice_worker(text, openvoice_engine, audio_dir, audio_lock, state_dict):
+    duration = 0
     try:
         state_dict["is_ai_speaking"] = True
 
@@ -46,7 +48,10 @@ def play_voice_worker(text, openvoice_engine, audio_dir, audio_lock, state_dict)
         if not os.path.exists(filepath):
             print(f"❌ Missing file: {filepath}")
             return
-
+        with wave.open(filepath, 'rb') as f:
+            frames = f.getnframes()
+            rate = f.getframerate()
+            duration = frames / float(rate)
         # ================= STREAM AUDIO =================
         state_dict["current_audio_url"] = f"/audio/{filename}"
 
@@ -75,7 +80,10 @@ def play_voice_worker(text, openvoice_engine, audio_dir, audio_lock, state_dict)
         print(f"❌ Voice Worker Error: {e}")
 
     finally:
-        time.sleep(0.2)
+        if duration > 0:
+            time.sleep(duration + 0.5) 
+        else:
+            time.sleep(0.2)
         state_dict["lip_sync_data"] = []
         state_dict["current_audio_url"] = ""
         state_dict["is_ai_speaking"] = False
